@@ -3,6 +3,7 @@ import '@vaadin/polymer-legacy-adapter/style-modules.js';
 import 'Frontend/generated/jar-resources/vaadin-grid-flow-selection-column.js';
 import '@vaadin/text-field/src/vaadin-text-field.js';
 import '@vaadin/form-layout/src/vaadin-form-layout.js';
+import '@vaadin/dialog/src/vaadin-dialog.js';
 import '@vaadin/email-field/src/vaadin-email-field.js';
 import '@vaadin/vertical-layout/src/vaadin-vertical-layout.js';
 import '@vaadin/tooltip/src/vaadin-tooltip.js';
