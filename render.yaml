@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: phonebook-app
+    env: docker
+    plan: free
+    region: oregon   # or frankfurt/london depending on your DB region
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    envVars:
+      - key: DB_URL
+        value: "jdbc:mysql://gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/phonebook_db?useSSL=false&serverTimezone=UTC"
+      - key: DB_USERNAME
+        value: "4MiKTMuGsZJw8jB.root"
+      - key: DB_PASSWORD
+        value: "G07qQe6rN3ePqcRl"
