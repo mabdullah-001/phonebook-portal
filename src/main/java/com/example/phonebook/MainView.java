@@ -1,374 +1,317 @@
 package com.example.phonebook;
 
-import com.example.phonebook.model.Contact;
-import com.example.phonebook.repository.ContactRepositoryJdbc;
-import com.vaadin.flow.component.button.Button;
+
+import com.example.phonebook.lock.Broadcaster;
+import com.example.phonebook.lock.LockRegistry;
+import com.example.phonebook.model.Person;
+import com.example.phonebook.repository.DataService;
+import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.DetachEvent;
+import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.crud.BinderCrudEditor;
+import com.vaadin.flow.component.crud.Crud;
+import com.vaadin.flow.component.crud.CrudEditor;
+
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.grid.Grid;
-import com.vaadin.flow.component.html.H1;
+import com.vaadin.flow.component.html.Div;
+
+
 import com.vaadin.flow.component.notification.Notification;
-import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
-import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+
 import com.vaadin.flow.component.textfield.EmailField;
 import com.vaadin.flow.component.textfield.TextField;
-import com.vaadin.flow.router.Route;
-import com.vaadin.flow.component.grid.HeaderRow;
 import com.vaadin.flow.data.binder.Binder;
-import com.vaadin.flow.data.value.ValueChangeMode;
-import com.vaadin.flow.component.dialog.Dialog;
 
-import java.util.Optional;
+import com.vaadin.flow.data.binder.ValidationResult;
+import com.vaadin.flow.router.Route;
+import com.vaadin.flow.component.button.Button;
+
+import com.vaadin.flow.component.icon.VaadinIcon;
+
+
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
+
+import java.util.Objects;
+import java.util.function.Consumer;
+
 
 @Route("")
-public class MainView extends VerticalLayout {
+public class MainView extends Div {
 
-    private final ContactService service;
-    private final Grid<Contact> grid = new Grid<>(Contact.class);
+    private Crud<Person> crud;
 
-    // Form fields
-    private final TextField nameField = new TextField("Name");
-    private final TextField phoneField = new TextField("Phone");
-    private final EmailField emailField = new EmailField("Email");
-    private final TextField countryField = new TextField("Country");
-    private final TextField cityField = new TextField("City");
-    private final TextField streetField = new TextField("Street");
+    private String NAME = "name";
+    private String PHONE_NUMBER= "phone";
+    private String EMAIL = "email";
+    private String STREET = "street";
+    private String CITY = "city";
+    private String COUNTRY = "country";
+    private String EDIT_COLUMN = "vaadin-crud-edit-column";
 
-    private final Button saveButton = new Button("Save");
-    private final Button deleteButton = new Button("Delete");
-    private final Button clearButton = new Button("Clear");
 
-    // Binder
-    private final Binder<Contact> binder = new Binder<>(Contact.class);
-
-    // dialog + current editing state
-    private final Dialog formDialog = new Dialog();
-    private Contact currentContact = null;    // reference to the contact currently being edited (or new)
-    private String originalPhone = null;      // store original phone of contact being edited
+    // for push notifications
+    private final String sessionId = java.util.UUID.randomUUID().toString();
+    private Consumer<String> broadcasterListener;
 
 
     public MainView() {
-        this.service = new ContactService(new ContactRepositoryJdbc());
+        // tag::snippet[]
+        crud = new Crud<>(Person.class, createEditor());
+        setupDataProvider();
+        setupGrid();
 
-        add(new H1("Phonebook Portal"));
+        setupToolbar();
 
-        // Configure Grid
-        grid.setColumns("name", "phone", "email", "country", "city", "street");
-        grid.setSizeFull();
+        add(crud);
+        // end::snippet[]
+    }
 
-        Grid.Column<Contact> nameCol    = grid.getColumnByKey("name");
-        Grid.Column<Contact> phoneCol   = grid.getColumnByKey("phone");
-        Grid.Column<Contact> emailCol   = grid.getColumnByKey("email");
-        Grid.Column<Contact> countryCol = grid.getColumnByKey("country");
-        Grid.Column<Contact> cityCol    = grid.getColumnByKey("city");
-        Grid.Column<Contact> streetCol  = grid.getColumnByKey("street");
-
-        HeaderRow filterRow = grid.appendHeaderRow();
-
-        TextField nameFilter    = createFilter("Name");
-        TextField phoneFilter   = createFilter("Phone");
-        TextField emailFilter   = createFilter("Email");
-        TextField countryFilter = createFilter("Country");
-        TextField cityFilter    = createFilter("City");
-        TextField streetFilter  = createFilter("Street");
-
-        filterRow.getCell(nameCol).setComponent(nameFilter);
-        filterRow.getCell(phoneCol).setComponent(phoneFilter);
-        filterRow.getCell(emailCol).setComponent(emailFilter);
-        filterRow.getCell(countryCol).setComponent(countryFilter);
-        filterRow.getCell(cityCol).setComponent(cityFilter);
-        filterRow.getCell(streetCol).setComponent(streetFilter);
-
-        Runnable applyColumnFilters = () -> grid.setItems(
-                service.getAllContacts().stream()
-                        .filter(c -> contains(c.getName(),    nameFilter.getValue()))
-                        .filter(c -> contains(c.getPhone(),   phoneFilter.getValue()))
-                        .filter(c -> contains(c.getEmail(),   emailFilter.getValue()))
-                        .filter(c -> contains(c.getCountry(), countryFilter.getValue()))
-                        .filter(c -> contains(c.getCity(),    cityFilter.getValue()))
-                        .filter(c -> contains(c.getStreet(),  streetFilter.getValue()))
-                        .toList()
-        );
-
-        nameFilter.addValueChangeListener(e -> applyColumnFilters.run());
-        phoneFilter.addValueChangeListener(e -> applyColumnFilters.run());
-        emailFilter.addValueChangeListener(e -> applyColumnFilters.run());
-        countryFilter.addValueChangeListener(e -> applyColumnFilters.run());
-        cityFilter.addValueChangeListener(e -> applyColumnFilters.run());
-        streetFilter.addValueChangeListener(e -> applyColumnFilters.run());
-
-        refreshGrid();
-
-        /*grid.asSingleSelect().addValueChangeListener(event -> {
-            Contact selected = event.getValue();
-            if (selected != null) {
-                fillForm(selected);
-            }
-        });*/
-
-        grid.asSingleSelect().addValueChangeListener(event -> {
-            Contact selected = event.getValue();
-            if (selected != null) {
-                openFormDialog(selected);
-            }
+    private void setupToolbar() {
+        Button button = new Button("Add Contact", VaadinIcon.PLUS.create());
+        button.addClickListener(event -> {
+            crud.edit(new Person(), Crud.EditMode.NEW_ITEM);
         });
+        button.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        crud.setNewButton(button);
+    }
+
+    private CrudEditor<Person> createEditor() {
+        TextField name = new TextField("name");
+        TextField phoneNumber = new TextField("Phone Number");
+        EmailField email = new EmailField("Email");
+        TextField street = new TextField("Street");
+        TextField city = new TextField("City");
+        TextField country = new TextField("Country");
+
+        FormLayout form = new FormLayout(name, phoneNumber, email,
+                street,city,country);
 
 
-        /*// Form Layout
-        FormLayout formLayout = new FormLayout(
-                nameField, phoneField, emailField, countryField, cityField, streetField
-        );
-        HorizontalLayout buttons = new HorizontalLayout(saveButton, deleteButton, clearButton);*/
 
-        // --- Binder Setup ---
-        binder.forField(nameField)
-                .asRequired("Name is required")
-                .bind(Contact::getName, Contact::setName);
-
-        binder.forField(phoneField)
+        DataService dataService = DataService.getInstance();
+        Binder<Person> binder = new Binder<>(Person.class);
+        binder.forField(name).asRequired().bind(Person::getName,
+                Person::setName);
+        binder.forField(phoneNumber)
                 .asRequired("Phone is required")
-                .withValidator(phone -> phone.matches("\\d+"), "Phone must contain only digits")
+                .withValidator(phone -> phone != null && phone.matches("\\d+"), "Phone must contain only digits")
                 .withValidator(phone -> {
-                    Optional<Contact> existing = service.getContactByPhone(phone);
-                    if (existing.isEmpty()) {
-                        return true; // no one has this phone → OK
+                    // If field is empty/null, let the required validator handle it (don't report "already exists")
+                    if (phone == null || phone.isBlank()) {
+                        return true;
                     }
-                    // allow if editing and this phone equals the original phone
-                    return originalPhone != null && existing.get().getPhone().equals(originalPhone);
-                }, "Phone must be unique")
-                .bind(Contact::getPhone, Contact::setPhone);
 
-        binder.forField(emailField)
-                .asRequired("Email is required")
-                .withValidator(email -> email.contains("@"), "Must be a valid email")
-                .bind(Contact::getEmail, Contact::setEmail);
+                    // Get the currently edited bean from the binder (may be null in some edge cases)
+                    /*Person editing = binder.getBean();
+                    Integer editingId = (editing == null) ? null : editing.getId();*/
 
-        binder.forField(countryField)
-                .asRequired("Country is required")
-                .bind(Contact::getCountry, Contact::setCountry);
+                    // O(1) cache lookup (doesn't hit DB)
+                    Person existing = DataService.getInstance().getFromCache(phone);
 
-        binder.forField(cityField)
-                .asRequired("City is required")
-                .bind(Contact::getCity, Contact::setCity);
+                    Person editing = crud.getEditor().getItem();
+                    Integer editingId = (editing == null) ? null : editing.getId();
 
-        binder.forField(streetField)
-                .bind(Contact::getStreet, Contact::setStreet);
 
-        // Enable save only if valid
-        binder.addStatusChangeListener(e -> saveButton.setEnabled(binder.isValid()));
+                    // Valid if:
+                    //  - there is no Person with this phone (existing == null), OR
+                    //  - the existing person is the same record currently being edited
+                    return (existing == null) || Objects.equals(existing.getId(), editingId);
+                }, "Phone Number already exists")
+                .bind(Person::getPhone, Person::setPhone);
 
-        /*// Button actions
-        saveButton.addClickListener(e -> saveContact());
-        deleteButton.addClickListener(e -> deleteContact());
-        clearButton.addClickListener(e -> clearForm());
+        binder.forField(email).asRequired()
+                .withValidator(
+                        value -> value != null && value.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$"),
+                        "Invalid email address")
+                .bind(Person::getEmail,
+                Person::setEmail);
+        binder.forField(street).asRequired().bind(Person::getStreet,
+                Person::setStreet);
+        binder.forField(city).asRequired().bind(Person::getCity,
+                Person::setCity);
+        binder.forField(country).asRequired().bind(Person::getCountry,
+                Person::setCountry);
 
-        add(grid, formLayout, buttons);
-        setSizeFull();*/
 
-        // add toolbar button (opens dialog for new contact)
-        Button addContactBtn = new Button("Add Contact", e -> openFormDialog(new Contact()));
-        //add(addContactBtn, grid);
-        add(grid,addContactBtn);
-        setSizeFull();
-
-        // configure the popup dialog (form inside a dialog)
-        configureFormDialog();
-
+        return new BinderCrudEditor<>(binder, form);
     }
 
-    private void openFormDialog(Contact contact) {
-        // set current contact & original phone for edit detection
-        currentContact = contact;
-        originalPhone = (contact.getPhone() == null || contact.getPhone().isBlank()) ? null : contact.getPhone();
+    private void setupGrid() {
+        Grid<Person> grid = crud.getGrid();
 
-        // bind bean to binder so fields map to this object (live updates)
-        binder.setBean(currentContact);
-
-        // enable/disable delete: hide delete when creating new
-        deleteButton.setVisible(originalPhone != null);
-
-        // open the dialog
-        formDialog.open();
-    }
-
-    private void configureFormDialog() {
-
-        // Form layout inside dialog
-        FormLayout formLayout = new FormLayout(
-                nameField, phoneField, emailField, countryField, cityField, streetField
-        );
-        formLayout.setResponsiveSteps(
-                new FormLayout.ResponsiveStep("0", 2)  // at all widths → 2 columns
-        );
-
-        // Buttons in dialog
-        HorizontalLayout buttons = new HorizontalLayout();
-        buttons.add(saveButton, deleteButton, clearButton);
-
-        // Save -> validate & persist
-        saveButton.addClickListener(e -> {
-            saveContact(); // we'll modify saveContact() below to use currentContact/binder
+        // Only show these columns (all columns shown by default):
+        List<String> visibleColumns = Arrays.asList(NAME, PHONE_NUMBER,
+                EMAIL, STREET,CITY,COUNTRY, EDIT_COLUMN);
+        grid.getColumns().forEach(column -> {
+            String key = column.getKey();
+            if (!visibleColumns.contains(key)) {
+                grid.removeColumn(column);
+            }
         });
+        /*grid.getColumns().forEach(col ->
+                System.out.println("Column key: " + col.getKey() + ", header: " + col.getHeaderText())
+        );*/
 
-        // Delete -> delete currentContact
-        deleteButton.addClickListener(e -> {
-            deleteContact(); // we'll modify deleteContact() below
-        });
+        // Reorder the columns (alphabetical by default)
+        grid.setColumnOrder(grid.getColumnByKey(NAME),
+                grid.getColumnByKey(PHONE_NUMBER), grid.getColumnByKey(EMAIL),
+                grid.getColumnByKey(STREET),grid.getColumnByKey(CITY),
+                grid.getColumnByKey(COUNTRY),
+                grid.getColumnByKey(EDIT_COLUMN));
 
-        // Cancel -> close dialog and clear state
-        clearButton.setText("Clear");
-        clearButton.addClickListener(e -> {
-            clearForm();       // clears fields + validation
-            formDialog.close();
-        });
+        Crud.removeEditColumn(grid);
+        // grid.removeColumnByKey(EDIT_COLUMN);
+        // grid.removeColumn(grid.getColumnByKey(EDIT_COLUMN));
 
-        formDialog.setHeaderTitle("Add / Edit Contact");
-        formDialog.add(formLayout, buttons);
-        formDialog.setWidth("70%");
-        formDialog.setHeight("60%");
-        formDialog.setCloseOnEsc(true);
-        formDialog.setCloseOnOutsideClick(false); // avoid accidental close
+        // Open editor on double click
+        /*grid.addItemDoubleClickListener(event -> crud.edit(event.getItem(),
+                Crud.EditMode.EXISTING_ITEM));*/
 
-    }
-
-    private void saveContact() {
-        try {
-            // Validate form values
-            if (!binder.validate().isOk()) {
-                Notification.show("Please fix validation errors before saving.");
+        grid.addItemDoubleClickListener(event -> {
+            Person person = event.getItem();
+            if (person == null || person.getId() == null) {
                 return;
             }
+            int recordId = person.getId();
 
-            // binder is set to currentContact, so get the bean
-            Contact bean = binder.getBean();
-            if (bean == null) {
-                Notification.show("No contact to save.");
-                return;
-            }
 
-            // If this is a NEW contact (originalPhone == null) → add
-            if (originalPhone == null) {
-                service.addContact(bean);
-                Notification.show("Contact added: " + bean.getName());
+            String holderMeta = person.getName() != null ? person.getName() : sessionId;
+            boolean acquired = LockRegistry.tryAcquire(recordId, sessionId, holderMeta);
+            if (acquired) {
+                // we own the lock — open editor
+                crud.edit(person, Crud.EditMode.EXISTING_ITEM);
             } else {
-                // Editing existing contact:
-                // If phone has changed, ensure uniqueness (extra guard)
-                if (!originalPhone.equals(bean.getPhone())) {
-                    if (service.getContactByPhone(bean.getPhone()).isPresent()) {
-                        Notification.show("Phone already exists. Choose a different phone.");
-                        return;
+                // notify user who holds it (if known)
+                LockRegistry.getHolderSessionId(recordId).ifPresentOrElse(holderSid -> {
+                    if (!holderSid.equals(sessionId)) {
+                        Notification.show("This record is already being edited by another user.", 4000, Notification.Position.MIDDLE);
+                    } else {
+                        // rare case: we are the holder (maybe re-open)
+                        crud.edit(person, Crud.EditMode.EXISTING_ITEM);
                     }
-                }
-                service.updateContact(bean);
-                Notification.show("Contact updated: " + bean.getName());
+                }, () -> {
+                    // no holder info (should not happen), just warn
+                    Notification.show("This record is currently locked.", 4000, Notification.Position.MIDDLE);
+                });
             }
+        });
 
-            refreshGrid();
-            formDialog.close();
-            // clear currentContact and originalPhone after save
-            currentContact = null;
-            originalPhone = null;
-            binder.setBean(null);
-        } catch (Exception ex) {
-            Notification.show("Error: " + ex.getMessage());
-        }
+
     }
 
+    private void setupDataProvider() {
+        //DataService dataService = new DataService();
+        DataService dataService = DataService.getInstance(); // use central singleton
+        PersonDataProvider dataProvider = new PersonDataProvider(dataService, true); // true = DB mode, false = in-memory
+        crud.setDataProvider(dataProvider);
+        /*crud.addDeleteListener(
+                deleteEvent -> dataProvider.delete(deleteEvent.getItem()));
+        crud.addSaveListener(
+                saveEvent -> dataProvider.persist(saveEvent.getItem()));*/
 
-    /*private void saveContact() {
+        crud.addSaveListener(saveEvent -> {
+            Person saved = saveEvent.getItem();
+            // Persist first (so DB is updated). If persist throws, we do not release lock.
+            try {
+                dataProvider.persist(saved);
+                // After successful persist, release the lock for this record
+                if (saved.getId() != null) {
+                    LockRegistry.release(saved.getId(), sessionId);
+                }
+            } catch (Exception ex) {
+                // show error and keep lock (so user may retry)
+                Notification.show("Save failed: " + ex.getMessage(), 5000, Notification.Position.MIDDLE);
+                throw ex; // rethrow if you want Crud to handle it
+            }
+        });
+
+        crud.addDeleteListener(deleteEvent -> {
+            Person deleted = deleteEvent.getItem();
+            try {
+                dataProvider.delete(deleted);
+                if (deleted.getId() != null) {
+                    LockRegistry.release(deleted.getId(), sessionId);
+                }
+            } catch (Exception ex) {
+                Notification.show("Delete failed: " + ex.getMessage(), 5000, Notification.Position.MIDDLE);
+                throw ex;
+            }
+        });
+
+// Release lock when user cancels editing
+        crud.addCancelListener(cancelEvent -> {
+            Person cancelled = cancelEvent.getItem();
+            if (cancelled != null && cancelled.getId() != null) {
+                LockRegistry.release(cancelled.getId(), sessionId);
+            }
+        });
+
+    }
+
+    @Override
+    protected void onAttach(AttachEvent attachEvent) {
+        super.onAttach(attachEvent);
+
+        // capture UI reference for safe UI.access() inside listener
+        final UI ui = attachEvent.getUI();
+
+        // create and register listener that will be invoked on broadcasts
+        broadcasterListener = message -> {
+            // Called from broadcaster executor thread — use ui.access to update UI
+            ui.access(() -> handleBroadcastMessage(message));
+        };
+        Broadcaster.register(broadcasterListener);
+    }
+
+    @Override
+    protected void onDetach(DetachEvent detachEvent) {
+        // cleanup broadcaster registration
+        if (broadcasterListener != null) {
+            Broadcaster.unregister(broadcasterListener);
+            broadcasterListener = null;
+        }
+        super.onDetach(detachEvent);
+    }
+
+    private void handleBroadcastMessage(String message) {
         try {
-            if (binder.validate().isOk()) {
-                Contact contact = new Contact(
-                        nameField.getValue(),
-                        phoneField.getValue(),
-                        emailField.getValue(),
-                        countryField.getValue(),
-                        cityField.getValue(),
-                        streetField.getValue()
-                );
+            // Expect messages like "LOCK:123:sessionId:metaEncoded" or "UNLOCK:123:sessionId"
+            if (message == null || message.isEmpty()) return;
+            if ("DATA_UPDATED".equals(message)) {
+                // Refresh grid data when someone else makes CRUD changes
+                crud.getDataProvider().refreshAll();
+                Notification.show("Data updated by another user", 3000, Notification.Position.BOTTOM_START);
+                return;
+            }
+            String[] parts = message.split(":", 4);
+            String type = parts[0];
+            int recordId = Integer.parseInt(parts[1]);
+            String ownerSession = parts[2];
+            String meta = parts.length >= 4 ? URLDecoder.decode(parts[3], StandardCharsets.UTF_8) : "";
 
-                Optional<Contact> existing = service.getContactByPhone(contact.getPhone());
-                if (existing.isPresent()) {
-                    service.updateContact(contact);
-                    Notification.show("Contact updated: " + contact.getName());
-                } else {
-                    service.addContact(contact);
-                    Notification.show("Contact added: " + contact.getName());
+            if ("LOCK".equals(type)) {
+                // someone locked a record. If it's me, we already opened editor.
+                if (!sessionId.equals(ownerSession)) {
+                    // optional: show small notification to this user
+                    // you can refine: only show if this UI is viewing the same record, etc.
+                    Notification.show("Record " + recordId + " is now being edited by another user (" + meta + ").", 3000, Notification.Position.MIDDLE);
                 }
-
-                refreshGrid();
-                clearForm();
+            } else if ("UNLOCK".equals(type)) {
+                if (!sessionId.equals(ownerSession)) {
+                    Notification.show("Record " + recordId + " is now available for editing.", 3000, Notification.Position.MIDDLE);
+                }
             }
         } catch (Exception ex) {
-            Notification.show("Error: " + ex.getMessage());
+            ex.printStackTrace();
         }
-    }*/
-
-
-
-    /*private void deleteContact() {
-        String phone = phoneField.getValue();
-        if (phone.isEmpty()) {
-            Notification.show("Please select a contact first.");
-            return;
-        }
-
-        service.getContactByPhone(phone).ifPresent(contact -> {
-            service.deleteContact(contact);
-            Notification.show("Deleted: " + contact.getName());
-            refreshGrid();
-            clearForm();
-        });
-    }*/
-
-    private void deleteContact() {
-        Contact bean = binder.getBean(); // current bean in dialog
-        if (bean == null || bean.getPhone() == null || bean.getPhone().isBlank()) {
-            Notification.show("Please select a contact first.");
-            return;
-        }
-
-        service.getContactByPhone(bean.getPhone()).ifPresent(contact -> {
-            service.deleteContact(contact);
-            Notification.show("Deleted: " + contact.getName());
-            refreshGrid();
-            formDialog.close();
-        });
     }
 
 
 
-    private void clearForm() {
-        nameField.clear();
-        phoneField.clear();
-        emailField.clear();
-        countryField.clear();
-        cityField.clear();
-        streetField.clear();
-
-        binder.readBean(null); // clears validation messages
-        currentContact = null;
-        originalPhone = null;
-    }
-
-    private void fillForm(Contact contact) {
-        binder.readBean(contact);
-    }
-
-    private void refreshGrid() {
-        grid.setItems(service.getAllContacts());
-    }
-
-    private TextField createFilter(String placeholder) {
-        TextField tf = new TextField();
-        tf.setPlaceholder("Filter " + placeholder);
-        tf.setClearButtonVisible(true);
-        tf.setWidthFull();
-        tf.setValueChangeMode(ValueChangeMode.LAZY);
-        return tf;
-    }
-
-    private boolean contains(String value, String filter) {
-        if (filter == null || filter.isBlank()) return true;
-        return value != null && value.toLowerCase().contains(filter.toLowerCase());
-    }
 }
+
