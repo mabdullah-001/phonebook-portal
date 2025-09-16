@@ -24,7 +24,6 @@ import com.vaadin.flow.component.textfield.EmailField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.binder.Binder;
 
-import com.vaadin.flow.data.binder.ValidationResult;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.component.button.Button;
 
@@ -68,7 +67,6 @@ public class MainView extends Div {
         setupToolbar();
 
         add(crud);
-        // end::snippet[]
     }
 
     private void setupToolbar() {
@@ -101,25 +99,13 @@ public class MainView extends Div {
                 .asRequired("Phone is required")
                 .withValidator(phone -> phone != null && phone.matches("\\d+"), "Phone must contain only digits")
                 .withValidator(phone -> {
-                    // If field is empty/null, let the required validator handle it (don't report "already exists")
                     if (phone == null || phone.isBlank()) {
                         return true;
                     }
-
-                    // Get the currently edited bean from the binder (may be null in some edge cases)
-                    /*Person editing = binder.getBean();
-                    Integer editingId = (editing == null) ? null : editing.getId();*/
-
-                    // O(1) cache lookup (doesn't hit DB)
                     Person existing = DataService.getInstance().getFromCache(phone);
-
                     Person editing = crud.getEditor().getItem();
                     Integer editingId = (editing == null) ? null : editing.getId();
 
-
-                    // Valid if:
-                    //  - there is no Person with this phone (existing == null), OR
-                    //  - the existing person is the same record currently being edited
                     return (existing == null) || Objects.equals(existing.getId(), editingId);
                 }, "Phone Number already exists")
                 .bind(Person::getPhone, Person::setPhone);
@@ -205,14 +191,9 @@ public class MainView extends Div {
     }
 
     private void setupDataProvider() {
-        //DataService dataService = new DataService();
         DataService dataService = DataService.getInstance(); // use central singleton
         PersonDataProvider dataProvider = new PersonDataProvider(dataService, true); // true = DB mode, false = in-memory
         crud.setDataProvider(dataProvider);
-        /*crud.addDeleteListener(
-                deleteEvent -> dataProvider.delete(deleteEvent.getItem()));
-        crud.addSaveListener(
-                saveEvent -> dataProvider.persist(saveEvent.getItem()));*/
 
         crud.addSaveListener(saveEvent -> {
             Person saved = saveEvent.getItem();
@@ -297,8 +278,6 @@ public class MainView extends Div {
             if ("LOCK".equals(type)) {
                 // someone locked a record. If it's me, we already opened editor.
                 if (!sessionId.equals(ownerSession)) {
-                    // optional: show small notification to this user
-                    // you can refine: only show if this UI is viewing the same record, etc.
                     Notification.show("Record " + recordId + " is now being edited by another user (" + meta + ").", 3000, Notification.Position.MIDDLE);
                 }
             } else if ("UNLOCK".equals(type)) {

@@ -14,28 +14,20 @@ public class Person implements Serializable {
 
     private Integer id;
 
-    /** Full name of person (we store as single 'name' per requirement). */
     private String name;
 
 
     private String phone;
 
-    /** Email address (optional but validated). */
     private String email;
 
-    /** Country name (optional). */
     private String country;
 
-    /** City name (optional). */
     private String city;
 
-    /** Street address (optional). */
+
     private String street;
 
-    /**
-     * Simple email validation pattern.
-     * NOTE: this is intentionally simple (covers usual cases). For full RFC compliance, use a specialized library.
-     */
     private static final Pattern EMAIL_PATTERN =
             Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
 

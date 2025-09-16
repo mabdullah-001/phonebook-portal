@@ -70,23 +70,13 @@ public class DataService {
 
     // Save contact (insert or update)
     public synchronized void save(Person contact) {
-        if (contact == null) {
-            throw new IllegalArgumentException("Contact is null");
-        }
 
         String phone = contact.getPhone();
-        if (phone == null || phone.isBlank()) {
-            throw new IllegalArgumentException("Phone number is required");
-        }
 
         Integer id = contact.getId();
-        Person cached = phoneIndex.get(phone);
 
         if (id == null) {
             // INSERT
-            if (cached != null) {
-                throw new IllegalArgumentException("Phone number already exists!");
-            }
             repository.add(contact);
 
             // get generated id back from DB
@@ -101,11 +91,6 @@ public class DataService {
         } else {
             // UPDATE
             String oldPhone = idToPhone.get(id);
-            if (!Objects.equals(phone, oldPhone)) {
-                if (cached != null && !Objects.equals(cached.getId(), id)) {
-                    throw new IllegalArgumentException("Phone number already exists!");
-                }
-            }
             repository.update(contact);
 
             if (oldPhone != null && !oldPhone.equals(phone)) {

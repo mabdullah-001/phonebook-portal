@@ -1,6 +1,5 @@
 package com.example.phonebook;
 
-//package com.vaadin.demo.component.crud;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -13,20 +12,16 @@ import java.util.stream.Stream;
 
 import com.example.phonebook.model.Person;
 import com.example.phonebook.repository.DataService;
-//import com.vaadin.demo.domain.DataService;
-//import com.vaadin.demo.domain.Person;
 import com.vaadin.flow.component.crud.CrudFilter;
 import com.vaadin.flow.data.provider.AbstractBackEndDataProvider;
 import com.vaadin.flow.data.provider.Query;
 import com.vaadin.flow.data.provider.SortDirection;
 import static java.util.Comparator.naturalOrder;
 
-// Person data provider
 public class PersonDataProvider
         extends AbstractBackEndDataProvider<Person, CrudFilter> {
 
     // A real app should hook up something like JPA
-    //final List<Person> DATABASE = new ArrayList<>(DataService.getPeople());
     private final List<Person> DATABASE = new ArrayList<>();
     private final DataService dataService;
     private final boolean useDatabase;
