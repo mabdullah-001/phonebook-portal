@@ -1,23 +1,30 @@
 package com.example.phonebook.model;
 
-
 import java.io.Serializable;
 import java.util.Comparator;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
-
-public class Person implements Serializable {
+/**
+ * Represents a contact in the Phonebook.
+ *
+ * - Mutable plain Java object (POJO) so Vaadin Binder can bind to it.
+ * - id is Integer (nullable) so new objects can exist before persistence assigns an id.
+ * - phone is expected to be unique (uniqueness enforced in the service layer).
+ */
+public class Contact implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-
+    /**
+     * Database / repository id. Nullable while the contact is not yet persisted.
+     */
     private Integer id;
 
     /** Full name of person (we store as single 'name' per requirement). */
     private String name;
 
-
+    /** Phone number (must be unique among contacts). */
     private String phone;
 
     /** Email address (optional but validated). */
@@ -39,16 +46,25 @@ public class Person implements Serializable {
     private static final Pattern EMAIL_PATTERN =
             Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
 
+    /**
+     * Comparator used to sort contacts by name (case-insensitive).
+     * Null names are ordered last.
+     */
+    public static final Comparator<Contact> NAME_COMPARATOR =
+            Comparator.comparing(Contact::getName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
 
-    public static final Comparator<Person> NAME_COMPARATOR =
-            Comparator.comparing(Person::getName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
+    /* ------------------------ Constructors ------------------------ */
 
-
-    public Person() {
+    /**
+     * No-arg constructor is required by many frameworks and is needed for Vaadin Binder.
+     */
+    public Contact() {
     }
 
-
-    public Person(Integer id, String name, String phone, String email,
+    /**
+     * Full constructor including id.
+     */
+    public Contact(Integer id, String name, String phone, String email,
                    String country, String city, String street) {
         this.id = id;
         this.name = name;
@@ -59,8 +75,10 @@ public class Person implements Serializable {
         this.street = street;
     }
 
-
-    public Person(String name, String phone, String email,
+    /**
+     * Convenience constructor without id (useful before persistence assigns an id).
+     */
+    public Contact(String name, String phone, String email,
                    String country, String city, String street) {
         this(null, name, phone, email, country, city, street);
     }
@@ -123,16 +141,33 @@ public class Person implements Serializable {
         this.street = street;
     }
 
+    /* ------------------------ Utility / Validation ------------------------ */
+
+    /**
+     * Returns true if this contact's email is a non-empty string and matches the EMAIL_PATTERN.
+     * Returns false if email is null, empty, or does not match.
+     */
     public boolean hasValidEmail() {
         String e = this.email;
         return e != null && !e.isBlank() && EMAIL_PATTERN.matcher(e).matches();
     }
 
+    /* ------------------------ equals / hashCode / toString ------------------------ */
 
+    /**
+     * Equality is based primarily on 'id' when available (persisted objects),
+     * otherwise falls back to 'phone' which we treat as a logical unique key.
+     *
+     * Rationale:
+     * - When object is persisted (id != null) the id is definitive and stable.
+     * - Before persistence the id may be null; phone is supposed to be unique,
+     *   so comparing by phone makes it possible to detect duplicates locally.
+     */
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof Person other)) return false;
+        if (!(o instanceof Contact)) return false;
+        Contact other = (Contact) o;
 
         if (this.id != null && other.id != null) {
             return this.id.equals(other.id);
@@ -150,7 +185,7 @@ public class Person implements Serializable {
 
     @Override
     public String toString() {
-        return "Person{" +
+        return "Contact{" +
                 "id=" + id +
                 ", name='" + name + '\'' +
                 ", phone='" + phone + '\'' +
@@ -161,5 +196,4 @@ public class Person implements Serializable {
                 '}';
     }
 }
-
 
