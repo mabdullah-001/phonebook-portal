@@ -129,7 +129,7 @@ public class MainView extends Div {
                         value -> value != null && value.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$"),
                         "Invalid email address")
                 .bind(Person::getEmail,
-                Person::setEmail);
+                        Person::setEmail);
         binder.forField(street).asRequired().bind(Person::getStreet,
                 Person::setStreet);
         binder.forField(city).asRequired().bind(Person::getCity,
