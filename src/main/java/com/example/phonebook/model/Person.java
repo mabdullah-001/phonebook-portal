@@ -28,8 +28,6 @@ public class Person implements Serializable {
 
     private String street;
 
-    private static final Pattern EMAIL_PATTERN =
-            Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
 
 
     public static final Comparator<Person> NAME_COMPARATOR =
