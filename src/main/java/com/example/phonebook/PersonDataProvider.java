@@ -77,9 +77,6 @@ public class PersonDataProvider
         return (int) count;
     }
 
-    void setSizeChangeListener(Consumer<Long> listener) {
-        sizeChangeListener = listener;
-    }
 
     private static Predicate<Person> predicate(CrudFilter filter) {
         // For RDBMS just generate a WHERE clause

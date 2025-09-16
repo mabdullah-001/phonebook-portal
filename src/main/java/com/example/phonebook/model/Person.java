@@ -52,10 +52,6 @@ public class Person implements Serializable {
     }
 
 
-    public Person(String name, String phone, String email,
-                  String country, String city, String street) {
-        this(null, name, phone, email, country, city, street);
-    }
 
     /* ------------------------ Getters & Setters ------------------------ */
 
@@ -115,10 +111,6 @@ public class Person implements Serializable {
         this.street = street;
     }
 
-    public boolean hasValidEmail() {
-        String e = this.email;
-        return e != null && !e.isBlank() && EMAIL_PATTERN.matcher(e).matches();
-    }
 
 
     @Override

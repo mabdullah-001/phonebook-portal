@@ -4,7 +4,6 @@ import com.example.phonebook.lock.Broadcaster;
 import com.example.phonebook.model.Person;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -46,16 +45,6 @@ public class DataService {
 
     }
 
-    // Paginated fetch for Vaadin
-    public List<Person> findAll(int offset, int limit) {
-        // JDBC repository doesn’t support pagination, so do it in-memory
-        List<Person> all = repository.findAll();
-        int toIndex = Math.min(offset + limit, all.size());
-        if (offset > toIndex) {
-            return List.of();
-        }
-        return all.subList(offset, toIndex);
-    }
 
     public List<Person> findAll() {
         return repository.findAll();
@@ -63,10 +52,6 @@ public class DataService {
 
 
 
-    // Count all records
-    public long count() {
-        return repository.findAll().size(); // can be optimized with SELECT COUNT(*)
-    }
 
     // Save contact (insert or update)
     public synchronized void save(Person contact) {
@@ -118,10 +103,7 @@ public class DataService {
         Broadcaster.broadcast("DATA_UPDATED");
     }
 
-    // Find by phone
-    public Optional<Person> findByPhone(String phone) {
-        return repository.findByPhone(phone);
-    }
+
 
     public Optional<Person> findById(Integer id) {
         return repository.findById(id);
