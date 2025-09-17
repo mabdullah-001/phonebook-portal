@@ -1,12 +1,8 @@
 package com.example.phonebook;
 
 
-import com.example.phonebook.lock.Broadcaster;
-import com.example.phonebook.lock.LockRegistry;
 import com.example.phonebook.model.Person;
 import com.example.phonebook.repository.DataService;
-import com.vaadin.flow.component.AttachEvent;
-import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.crud.BinderCrudEditor;
@@ -30,13 +26,11 @@ import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.icon.VaadinIcon;
 
 
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
+
 import java.util.Arrays;
 import java.util.List;
 
 import java.util.Objects;
-import java.util.function.Consumer;
 
 
 @Route("")
@@ -52,11 +46,9 @@ public class MainView extends Div {
     private String COUNTRY = "country";
     private String EDIT_COLUMN = "vaadin-crud-edit-column";
 
-
-    // for push notifications
-    private final String sessionId = java.util.UUID.randomUUID().toString();
-    private Consumer<String> broadcasterListener;
-
+    // Unique user/session ID
+    private final String userId = UI.getCurrent().getSession().getSession().getId();
+    private boolean lastUpdateByMe = false;
 
     public MainView() {
         // tag::snippet[]
@@ -67,6 +59,30 @@ public class MainView extends Div {
         setupToolbar();
 
         add(crud);
+
+        setupAutoRefresh(crud);
+    }
+
+    private void setupAutoRefresh(Crud<Person> crud) {
+        // Track last seen version for this UI
+        final long[] lastSeenVersion = { DataService.getInstance().getVersion() };
+
+        // Enable Vaadin polling (every 3 seconds)
+        UI.getCurrent().setPollInterval(3000);
+
+        UI.getCurrent().addPollListener(e -> {
+            long currentVersion = DataService.getInstance().getVersion();
+            if (currentVersion != lastSeenVersion[0]) {
+                lastSeenVersion[0] = currentVersion;
+                crud.getGrid().getDataProvider().refreshAll();
+                if (lastUpdateByMe) {
+                    lastUpdateByMe = false; // reset, no Notification for self
+                } else {
+                    Notification.show("Data updated from another user",
+                            2000, Notification.Position.TOP_END);
+                }
+            }
+        });
     }
 
     private void setupToolbar() {
@@ -157,33 +173,14 @@ public class MainView extends Div {
         // Open editor on double click
         /*grid.addItemDoubleClickListener(event -> crud.edit(event.getItem(),
                 Crud.EditMode.EXISTING_ITEM));*/
-
         grid.addItemDoubleClickListener(event -> {
             Person person = event.getItem();
-            if (person == null || person.getId() == null) {
-                return;
-            }
-            int recordId = person.getId();
+            boolean locked = DataService.getInstance().lockRecord(person.getId(), userId);
 
-
-            String holderMeta = person.getName() != null ? person.getName() : sessionId;
-            boolean acquired = LockRegistry.tryAcquire(recordId, sessionId, holderMeta);
-            if (acquired) {
-                // we own the lock — open editor
-                crud.edit(person, Crud.EditMode.EXISTING_ITEM);
+            if (!locked) {
+                Notification.show("This record is already being edited by another user");
             } else {
-                // notify user who holds it (if known)
-                LockRegistry.getHolderSessionId(recordId).ifPresentOrElse(holderSid -> {
-                    if (!holderSid.equals(sessionId)) {
-                        Notification.show("This record is already being edited by another user.", 4000, Notification.Position.MIDDLE);
-                    } else {
-                        // rare case: we are the holder (maybe re-open)
-                        crud.edit(person, Crud.EditMode.EXISTING_ITEM);
-                    }
-                }, () -> {
-                    // no holder info (should not happen), just warn
-                    Notification.show("This record is currently locked.", 4000, Notification.Position.MIDDLE);
-                });
+                crud.edit(person, Crud.EditMode.EXISTING_ITEM);
             }
         });
 
@@ -192,105 +189,36 @@ public class MainView extends Div {
 
     private void setupDataProvider() {
         DataService dataService = DataService.getInstance(); // use central singleton
-        PersonDataProvider dataProvider = new PersonDataProvider(dataService, true); // true = DB mode, false = in-memory
+        PersonDataProvider dataProvider = new PersonDataProvider(dataService, false); // true = DB mode, false = in-memory
         crud.setDataProvider(dataProvider);
 
         crud.addSaveListener(saveEvent -> {
-            Person saved = saveEvent.getItem();
-            // Persist first (so DB is updated). If persist throws, we do not release lock.
-            try {
-                dataProvider.persist(saved);
-                // After successful persist, release the lock for this record
-                if (saved.getId() != null) {
-                    LockRegistry.release(saved.getId(), sessionId);
-                }
-            } catch (Exception ex) {
-                // show error and keep lock (so user may retry)
-                Notification.show("Save failed: " + ex.getMessage(), 5000, Notification.Position.MIDDLE);
-                throw ex; // rethrow if you want Crud to handle it
-            }
+            lastUpdateByMe = true;  // mark change came from me
+            Person person = saveEvent.getItem();
+            dataProvider.persist(person);
+            DataService.getInstance().unlockRecord(person.getId(), userId);
         });
 
         crud.addDeleteListener(deleteEvent -> {
-            Person deleted = deleteEvent.getItem();
-            try {
-                dataProvider.delete(deleted);
-                if (deleted.getId() != null) {
-                    LockRegistry.release(deleted.getId(), sessionId);
-                }
-            } catch (Exception ex) {
-                Notification.show("Delete failed: " + ex.getMessage(), 5000, Notification.Position.MIDDLE);
-                throw ex;
-            }
+            lastUpdateByMe = true;  // mark change came from me
+            Person person = deleteEvent.getItem();
+            dataProvider.delete(person);
+            DataService.getInstance().unlockRecord(person.getId(), userId);
         });
 
-// Release lock when user cancels editing
+
         crud.addCancelListener(cancelEvent -> {
-            Person cancelled = cancelEvent.getItem();
-            if (cancelled != null && cancelled.getId() != null) {
-                LockRegistry.release(cancelled.getId(), sessionId);
+            Person person = cancelEvent.getItem();
+            if (person != null && person.getId() != null) {
+                DataService.getInstance().unlockRecord(person.getId(), userId);
             }
         });
 
-    }
 
-    @Override
-    protected void onAttach(AttachEvent attachEvent) {
-        super.onAttach(attachEvent);
-
-        // capture UI reference for safe UI.access() inside listener
-        final UI ui = attachEvent.getUI();
-
-        // create and register listener that will be invoked on broadcasts
-        broadcasterListener = message -> {
-            // Called from broadcaster executor thread — use ui.access to update UI
-            ui.access(() -> handleBroadcastMessage(message));
-        };
-        Broadcaster.register(broadcasterListener);
-    }
-
-    @Override
-    protected void onDetach(DetachEvent detachEvent) {
-        // cleanup broadcaster registration
-        if (broadcasterListener != null) {
-            Broadcaster.unregister(broadcasterListener);
-            broadcasterListener = null;
-        }
-        super.onDetach(detachEvent);
-    }
-
-    private void handleBroadcastMessage(String message) {
-        try {
-            // Expect messages like "LOCK:123:sessionId:metaEncoded" or "UNLOCK:123:sessionId"
-            if (message == null || message.isEmpty()) return;
-            if ("DATA_UPDATED".equals(message)) {
-                // Refresh grid data when someone else makes CRUD changes
-                crud.getDataProvider().refreshAll();
-                Notification.show("Data updated by another user", 3000, Notification.Position.BOTTOM_START);
-                return;
-            }
-            String[] parts = message.split(":", 4);
-            String type = parts[0];
-            int recordId = Integer.parseInt(parts[1]);
-            String ownerSession = parts[2];
-            String meta = parts.length >= 4 ? URLDecoder.decode(parts[3], StandardCharsets.UTF_8) : "";
-
-            if ("LOCK".equals(type)) {
-                // someone locked a record. If it's me, we already opened editor.
-                if (!sessionId.equals(ownerSession)) {
-                    Notification.show("Record " + recordId + " is now being edited by another user (" + meta + ").", 3000, Notification.Position.MIDDLE);
-                }
-            } else if ("UNLOCK".equals(type)) {
-                if (!sessionId.equals(ownerSession)) {
-                    Notification.show("Record " + recordId + " is now available for editing.", 3000, Notification.Position.MIDDLE);
-                }
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
     }
 
 
 
-}
+
+}// end of class
 

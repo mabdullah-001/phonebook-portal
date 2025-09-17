@@ -1,12 +1,12 @@
 package com.example.phonebook.repository;
 
-import com.example.phonebook.lock.Broadcaster;
 import com.example.phonebook.model.Person;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class DataService {
 
@@ -23,6 +23,12 @@ public class DataService {
     private final ConcurrentMap<String, Person> phoneIndex = new ConcurrentHashMap<>();  //Used by the binder validator and by save() method.
     private final ConcurrentMap<Integer, String> idToPhone = new ConcurrentHashMap<>(); //To update/delete cache correctly, you must know the old phone number for that ID.
 
+    // --- Global version counter for dirty flag ---
+    private final AtomicLong version = new AtomicLong(0);
+
+    // --- Active record locks (per record) ---
+    // Key = record id, Value = userId/sessionId
+    private final ConcurrentMap<Integer, String> activeLocks = new ConcurrentHashMap<>();
     // Constructor
     public DataService() {
         reloadCache(); // build cache once at startup
@@ -44,6 +50,31 @@ public class DataService {
 
 
     }
+
+    // ===== Dirty flag helpers =====
+    private void markDirty() {
+        version.incrementAndGet();
+    }
+
+    public long getVersion() {
+        return version.get();
+    }
+
+    // ===== Locking helpers =====
+    public boolean lockRecord(Integer id, String userId) {
+        // Only one user can acquire the lock at a time
+        return activeLocks.putIfAbsent(id, userId) == null;
+    }
+
+    public void unlockRecord(Integer id, String userId) {
+        // Only unlock if the same user is holding the lock
+        activeLocks.computeIfPresent(id, (k, v) -> v.equals(userId) ? null : v);
+    }
+
+    public Optional<String> getRecordLockOwner(Integer id) {
+        return Optional.ofNullable(activeLocks.get(id));
+    }
+
 
 
     public List<Person> findAll() {
@@ -70,7 +101,6 @@ public class DataService {
                 contact.setId(p.getId());
                 phoneIndex.put(phone, p);
                 idToPhone.put(p.getId(), phone);
-                Broadcaster.broadcast("DATA_UPDATED");
             });
 
         } else {
@@ -83,8 +113,8 @@ public class DataService {
             }
             phoneIndex.put(phone, contact);
             idToPhone.put(id, phone);
-            Broadcaster.broadcast("DATA_UPDATED");
         }
+        markDirty();
     }
 
     // Delete contact
@@ -99,8 +129,8 @@ public class DataService {
         if (contact.getId() != null) {
             idToPhone.remove(contact.getId());
         }
+        markDirty();
 
-        Broadcaster.broadcast("DATA_UPDATED");
     }
 
 

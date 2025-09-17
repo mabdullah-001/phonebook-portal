@@ -27,6 +27,8 @@ public class PersonDataProvider
     private final boolean useDatabase;
     private Consumer<Long> sizeChangeListener;
 
+    private long lastSeenVersion = -1;
+
     public PersonDataProvider(DataService dataService, boolean useDatabase) {
         this.dataService = dataService;
         this.useDatabase = useDatabase;
@@ -42,9 +44,15 @@ public class PersonDataProvider
         int limit = query.getLimit();
 
         // Always work on DATABASE list
-        if (useDatabase) {
-            DATABASE.clear();
-            DATABASE.addAll(dataService.findAll()); // load everything once
+        // Smart check: only reload if data changed
+        if (useDatabase){
+            long currentVersion = dataService.getVersion();
+            if (currentVersion != lastSeenVersion) {
+                lastSeenVersion = currentVersion;
+
+                DATABASE.clear();
+                DATABASE.addAll(dataService.findAll()); // reload from DB
+            }
         }
 
         Stream<Person> stream = DATABASE.stream();
