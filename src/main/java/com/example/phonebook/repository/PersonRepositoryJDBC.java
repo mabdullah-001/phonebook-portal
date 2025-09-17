@@ -1,19 +1,21 @@
 package com.example.phonebook.repository;
 
-import com.example.phonebook.ContactRepository;
-import com.example.phonebook.model.Contact;
 import com.example.phonebook.db.Database;
+import com.example.phonebook.model.Person;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class ContactRepositoryJdbc extends ContactRepository {
+public class PersonRepositoryJDBC {
 
-    @Override
-    public List<Contact> findAll() {
-        List<Contact> contacts = new ArrayList<>();
+
+    public List<Person> findAll() {
+        List<Person> contacts = new ArrayList<>();
         String sql = "SELECT * FROM contacts ORDER BY name";
 
         try (Connection conn = Database.getConnection();
@@ -29,8 +31,11 @@ public class ContactRepositoryJdbc extends ContactRepository {
         return contacts;
     }
 
-    @Override
-    public Optional<Contact> findByPhone(String phone) {
+
+
+
+
+    public Optional<Person> findByPhone(String phone) {
         String sql = "SELECT * FROM contacts WHERE phone = ?";
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -45,8 +50,23 @@ public class ContactRepositoryJdbc extends ContactRepository {
         return Optional.empty();
     }
 
-    @Override
-    public void add(Contact contact) {
+    public Optional<Person> findById(Integer id) {
+        String sql = "SELECT * FROM contacts WHERE id = ?";
+        try (Connection conn = Database.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, id);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return Optional.of(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return Optional.empty();
+    }
+
+
+    public void add(Person contact) {
         String sql = "INSERT INTO contacts (name, phone, email, country, city, street) VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -64,18 +84,19 @@ public class ContactRepositoryJdbc extends ContactRepository {
         }
     }
 
-    @Override
-    public void update(Contact contact) {
-        String sql = "UPDATE contacts SET name=?, email=?, country=?, city=?, street=? WHERE phone=?";
+
+    public void update(Person contact) {
+        String sql = "UPDATE contacts SET name=?, phone=?,email=?, country=?, city=?, street=? WHERE id=?";
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, contact.getName());
-            stmt.setString(2, contact.getEmail());
-            stmt.setString(3, contact.getCountry());
-            stmt.setString(4, contact.getCity());
-            stmt.setString(5, contact.getStreet());
-            stmt.setString(6, contact.getPhone());
+            stmt.setString(2, contact.getPhone());
+            stmt.setString(3, contact.getEmail());
+            stmt.setString(4, contact.getCountry());
+            stmt.setString(5, contact.getCity());
+            stmt.setString(6, contact.getStreet());
+            stmt.setInt(7,  contact.getId());
             stmt.executeUpdate();
 
         } catch (SQLException e) {
@@ -83,13 +104,13 @@ public class ContactRepositoryJdbc extends ContactRepository {
         }
     }
 
-    @Override
-    public void delete(Contact contact) {
-        String sql = "DELETE FROM contacts WHERE phone=?";
+
+    public void delete(Person contact) {
+        String sql = "DELETE FROM contacts WHERE id=?";
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setString(1, contact.getPhone());
+            stmt.setInt(1, contact.getId());
             stmt.executeUpdate();
 
         } catch (SQLException e) {
@@ -97,15 +118,15 @@ public class ContactRepositoryJdbc extends ContactRepository {
         }
     }
 
-    private Contact mapRow(ResultSet rs) throws SQLException {
-        return new Contact(
-                rs.getString("name"),
-                rs.getString("phone"),
-                rs.getString("email"),
-                rs.getString("country"),
-                rs.getString("city"),
-                rs.getString("street")
-        );
+    private Person mapRow(ResultSet rs) throws SQLException {
+        Person person = new Person();
+        person.setId(rs.getInt("id"));
+        person.setName(rs.getString("name"));
+        person.setPhone(rs.getString("phone"));
+        person.setEmail(rs.getString("email"));
+        person.setCountry(rs.getString("country"));
+        person.setCity(rs.getString("city"));
+        person.setStreet(rs.getString("street"));
+        return person;
     }
 }
-
