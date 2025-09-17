@@ -189,7 +189,7 @@ public class MainView extends Div {
 
     private void setupDataProvider() {
         DataService dataService = DataService.getInstance(); // use central singleton
-        PersonDataProvider dataProvider = new PersonDataProvider(dataService, false); // true = DB mode, false = in-memory
+        PersonDataProvider dataProvider = new PersonDataProvider(dataService, true); // true = DB mode, false = in-memory
         crud.setDataProvider(dataProvider);
 
         crud.addSaveListener(saveEvent -> {

@@ -2,10 +2,7 @@ package com.example.phonebook;
 
 
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -22,7 +19,7 @@ public class PersonDataProvider
         extends AbstractBackEndDataProvider<Person, CrudFilter> {
 
     // A real app should hook up something like JPA
-    private final List<Person> DATABASE = new ArrayList<>();
+    //private final List<Person> DATABASE = new ArrayList<>();
     private final DataService dataService;
     private final boolean useDatabase;
     private Consumer<Long> sizeChangeListener;
@@ -38,24 +35,28 @@ public class PersonDataProvider
 
 
 
+
+
+
+
+
     @Override
     protected Stream<Person> fetchFromBackEnd(Query<Person, CrudFilter> query) {
         int offset = query.getOffset();
         int limit = query.getLimit();
 
-        // Always work on DATABASE list
-        // Smart check: only reload if data changed
-        if (useDatabase){
+        if (useDatabase) {
             long currentVersion = dataService.getVersion();
             if (currentVersion != lastSeenVersion) {
                 lastSeenVersion = currentVersion;
-
-                DATABASE.clear();
-                DATABASE.addAll(dataService.findAll()); // reload from DB
+                dataService.reloadFromDatabase();
             }
+        } else {
+            // Always rebuild indexes from in-memory list, no DB hit
+            dataService.reloadInMemory();
         }
 
-        Stream<Person> stream = DATABASE.stream();
+        Stream<Person> stream = dataService.getInMemory().stream();
 
         if (query.getFilter().isPresent()) {
             stream = stream.filter(predicate(query.getFilter().get()))
@@ -64,8 +65,6 @@ public class PersonDataProvider
 
         return stream.skip(offset).limit(limit);
     }
-
-
 
     @Override
     protected int sizeInBackEnd(Query<Person, CrudFilter> query) {
@@ -84,6 +83,7 @@ public class PersonDataProvider
 
         return (int) count;
     }
+
 
 
     private static Predicate<Person> predicate(CrudFilter filter) {
@@ -131,40 +131,50 @@ public class PersonDataProvider
         }
     }
 
-    // Save or update
     void persist(Person item) {
         if (useDatabase) {
             dataService.save(item);
         } else {
+            List<Person> mem = dataService.getInMemory();
             if (item.getId() == null) {
-                item.setId(DATABASE.stream().map(Person::getId).max(naturalOrder()).orElse(0) + 1);
+                item.setId(mem.stream().map(Person::getId)
+                        .max(naturalOrder()).orElse(0) + 1);
             }
-            final Optional<Person> existingItem = find(item.getId());
+            final Optional<Person> existingItem = mem.stream()
+                    .filter(p -> p.getId().equals(item.getId()))
+                    .findFirst();
+
             if (existingItem.isPresent()) {
-                int position = DATABASE.indexOf(existingItem.get());
-                DATABASE.remove(existingItem.get());
-                DATABASE.add(position, item);
+                int position = mem.indexOf(existingItem.get());
+                mem.remove(existingItem.get());
+                mem.add(position, item);
             } else {
-                DATABASE.add(item);
+                mem.add(item);
             }
+            dataService.reloadInMemory();  // rebuild indexes
+            dataService.getVersionAtomic().incrementAndGet(); // bump version
         }
     }
 
 
-    Optional<Person> find(Integer id) {
+
+    /*Optional<Person> find(Integer id) {
         if (useDatabase) {
             return dataService.findById(id);
         } else {
             return DATABASE.stream().filter(entity -> entity.getId().equals(id)).findFirst();
         }
-    }
+    }*/
 
 
     void delete(Person item) {
         if (useDatabase) {
             dataService.delete(item);
         } else {
-            DATABASE.removeIf(entity -> entity.getId().equals(item.getId()));
+            List<Person> mem = dataService.getInMemory();
+            mem.removeIf(entity -> entity.getId().equals(item.getId()));
+            dataService.reloadInMemory();  // rebuild indexes
+            dataService.getVersionAtomic().incrementAndGet(); // bump version
         }
     }
-}
+}// end of class

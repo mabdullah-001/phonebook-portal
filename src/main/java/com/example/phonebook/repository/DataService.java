@@ -29,12 +29,25 @@ public class DataService {
     // --- Active record locks (per record) ---
     // Key = record id, Value = userId/sessionId
     private final ConcurrentMap<Integer, String> activeLocks = new ConcurrentHashMap<>();
+
+    private final List<Person> inMemoryDb =
+            java.util.Collections.synchronizedList(new java.util.ArrayList<>());
     // Constructor
     public DataService() {
-        reloadCache(); // build cache once at startup
+        //reloadCache(); // build cache once at startup
     }
 
-    private synchronized void reloadCache() {
+    // Accessors for PersonDataProvider
+    public List<Person> getInMemory() {
+        return inMemoryDb;
+    }
+
+
+    public AtomicLong getVersionAtomic() {
+        return version;
+    }
+
+    /*private synchronized void reloadCache() {
         phoneIndex.clear();
         idToPhone.clear();
 
@@ -49,6 +62,38 @@ public class DataService {
         }
 
 
+    }*/
+
+    public synchronized void reloadFromDatabase() {
+        phoneIndex.clear();
+        idToPhone.clear();
+        inMemoryDb.clear();
+
+        List<Person> all = repository.findAll();
+        for (Person p : all) {
+            if (p.getPhone() != null) {
+                phoneIndex.put(p.getPhone(), p);
+            }
+            if (p.getId() != null && p.getPhone() != null) {
+                idToPhone.put(p.getId(), p.getPhone());
+            }
+            inMemoryDb.add(p);
+        }
+    }
+
+    // Reload from in-memory only → used in in-memory mode
+    public synchronized void reloadInMemory() {
+        phoneIndex.clear();
+        idToPhone.clear();
+
+        for (Person p : inMemoryDb) {
+            if (p.getPhone() != null) {
+                phoneIndex.put(p.getPhone(), p);
+            }
+            if (p.getId() != null && p.getPhone() != null) {
+                idToPhone.put(p.getId(), p.getPhone());
+            }
+        }
     }
 
     // ===== Dirty flag helpers =====
