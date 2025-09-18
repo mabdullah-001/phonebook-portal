@@ -9,6 +9,7 @@ import java.util.stream.Stream;
 
 import com.example.phonebook.model.Person;
 import com.example.phonebook.repository.DataService;
+import com.example.phonebook.repository.exception.StaleDataException;
 import com.vaadin.flow.component.crud.CrudFilter;
 import com.vaadin.flow.data.provider.AbstractBackEndDataProvider;
 import com.vaadin.flow.data.provider.Query;
@@ -133,7 +134,13 @@ public class PersonDataProvider
 
     void persist(Person item) {
         if (useDatabase) {
-            dataService.save(item);
+            try {
+                dataService.save(item);
+                refreshItem(item);
+            } catch (StaleDataException e) {
+                // Propagate the exception to MainView
+                throw e;
+            }
         } else {
             List<Person> mem = dataService.getInMemory();
             if (item.getId() == null) {
@@ -169,7 +176,12 @@ public class PersonDataProvider
 
     void delete(Person item) {
         if (useDatabase) {
-            dataService.delete(item);
+            try {
+                dataService.delete(item);
+            } catch (StaleDataException e) {
+                // Propagate the exception to MainView
+                throw e;
+            }
         } else {
             List<Person> mem = dataService.getInMemory();
             mem.removeIf(entity -> entity.getId().equals(item.getId()));

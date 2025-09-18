@@ -16,7 +16,7 @@ public class PersonRepositoryJDBC {
 
     public List<Person> findAll() {
         List<Person> contacts = new ArrayList<>();
-        String sql = "SELECT * FROM contacts ORDER BY name";
+        String sql = "SELECT id, name, phone, email, country, city, street, last_updated FROM contacts ORDER BY name";
 
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql);
@@ -32,11 +32,8 @@ public class PersonRepositoryJDBC {
     }
 
 
-
-
-
     public Optional<Person> findByPhone(String phone) {
-        String sql = "SELECT * FROM contacts WHERE phone = ?";
+        String sql = "SELECT id, name, phone, email, country, city, street, last_updated FROM contacts WHERE phone = ?";
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, phone);
@@ -51,7 +48,7 @@ public class PersonRepositoryJDBC {
     }
 
     public Optional<Person> findById(Integer id) {
-        String sql = "SELECT * FROM contacts WHERE id = ?";
+        String sql = "SELECT id, name, phone, email, country, city, street, last_updated FROM contacts WHERE id = ?";
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, id);
@@ -85,8 +82,8 @@ public class PersonRepositoryJDBC {
     }
 
 
-    public void update(Person contact) {
-        String sql = "UPDATE contacts SET name=?, phone=?,email=?, country=?, city=?, street=? WHERE id=?";
+    public boolean update(Person contact) {
+        String sql = "UPDATE contacts SET name=?, phone=?, email=?, country=?, city=?, street=? WHERE id=? AND last_updated=?";
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
@@ -96,25 +93,31 @@ public class PersonRepositoryJDBC {
             stmt.setString(4, contact.getCountry());
             stmt.setString(5, contact.getCity());
             stmt.setString(6, contact.getStreet());
-            stmt.setInt(7,  contact.getId());
-            stmt.executeUpdate();
+            stmt.setInt(7, contact.getId());
+            stmt.setTimestamp(8, new java.sql.Timestamp(contact.getLastUpdated().getTime()));
 
+            int rowsAffected = stmt.executeUpdate();
+            return rowsAffected > 0;
         } catch (SQLException e) {
             e.printStackTrace();
+            return false;
         }
     }
 
 
-    public void delete(Person contact) {
-        String sql = "DELETE FROM contacts WHERE id=?";
+    public boolean delete(Person contact) {
+        String sql = "DELETE FROM contacts WHERE id=? AND last_updated=?";
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, contact.getId());
-            stmt.executeUpdate();
+            stmt.setTimestamp(2, new java.sql.Timestamp(contact.getLastUpdated().getTime()));
 
+            int rowsAffected = stmt.executeUpdate();
+            return rowsAffected > 0;
         } catch (SQLException e) {
             e.printStackTrace();
+            return false;
         }
     }
 
@@ -127,6 +130,7 @@ public class PersonRepositoryJDBC {
         person.setCountry(rs.getString("country"));
         person.setCity(rs.getString("city"));
         person.setStreet(rs.getString("street"));
+        person.setLastUpdated(rs.getTimestamp("last_updated"));
         return person;
     }
 }

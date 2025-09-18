@@ -3,6 +3,7 @@ package com.example.phonebook;
 
 import com.example.phonebook.model.Person;
 import com.example.phonebook.repository.DataService;
+import com.example.phonebook.repository.exception.StaleDataException;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.crud.BinderCrudEditor;
@@ -16,6 +17,7 @@ import com.vaadin.flow.component.html.Div;
 
 import com.vaadin.flow.component.notification.Notification;
 
+import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.textfield.EmailField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.binder.Binder;
@@ -47,7 +49,7 @@ public class MainView extends Div {
     private String EDIT_COLUMN = "vaadin-crud-edit-column";
 
     // Unique user/session ID
-    private final String userId = UI.getCurrent().getSession().getSession().getId();
+    //private final String userId = UI.getCurrent().getSession().getSession().getId();
     private boolean lastUpdateByMe = false;
 
     public MainView() {
@@ -60,7 +62,7 @@ public class MainView extends Div {
 
         add(crud);
 
-        setupAutoRefresh(crud);
+        //setupAutoRefresh(crud);
     }
 
     private void setupAutoRefresh(Crud<Person> crud) {
@@ -173,7 +175,7 @@ public class MainView extends Div {
         // Open editor on double click
         /*grid.addItemDoubleClickListener(event -> crud.edit(event.getItem(),
                 Crud.EditMode.EXISTING_ITEM));*/
-        grid.addItemDoubleClickListener(event -> {
+        /*grid.addItemDoubleClickListener(event -> {
             Person person = event.getItem();
             boolean locked = DataService.getInstance().lockRecord(person.getId(), userId);
 
@@ -182,7 +184,10 @@ public class MainView extends Div {
             } else {
                 crud.edit(person, Crud.EditMode.EXISTING_ITEM);
             }
-        });
+        });*/
+
+        grid.addItemDoubleClickListener(event -> crud.edit(event.getItem(), Crud.EditMode.EXISTING_ITEM));
+
 
 
     }
@@ -193,26 +198,30 @@ public class MainView extends Div {
         crud.setDataProvider(dataProvider);
 
         crud.addSaveListener(saveEvent -> {
-            lastUpdateByMe = true;  // mark change came from me
-            Person person = saveEvent.getItem();
-            dataProvider.persist(person);
-            DataService.getInstance().unlockRecord(person.getId(), userId);
+            try {
+                dataProvider.persist(saveEvent.getItem());
+            } catch (StaleDataException e) {
+                Notification notification = Notification.show(e.getMessage(), 5000, Notification.Position.BOTTOM_END);
+                notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
         });
 
         crud.addDeleteListener(deleteEvent -> {
-            lastUpdateByMe = true;  // mark change came from me
-            Person person = deleteEvent.getItem();
-            dataProvider.delete(person);
-            DataService.getInstance().unlockRecord(person.getId(), userId);
+            try {
+                dataProvider.delete(deleteEvent.getItem());
+            } catch (StaleDataException e) {
+                Notification notification = Notification.show(e.getMessage(), 5000, Notification.Position.BOTTOM_END);
+                notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
         });
 
 
-        crud.addCancelListener(cancelEvent -> {
+        /*crud.addCancelListener(cancelEvent -> {
             Person person = cancelEvent.getItem();
             if (person != null && person.getId() != null) {
                 DataService.getInstance().unlockRecord(person.getId(), userId);
             }
-        });
+        });*/
 
 
     }

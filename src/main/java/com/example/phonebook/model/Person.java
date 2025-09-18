@@ -3,6 +3,7 @@ package com.example.phonebook.model;
 
 import java.io.Serializable;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -28,6 +29,7 @@ public class Person implements Serializable {
 
     private String street;
 
+    private Date lastUpdated;
 
 
     public static final Comparator<Person> NAME_COMPARATOR =
@@ -39,7 +41,7 @@ public class Person implements Serializable {
 
 
     public Person(Integer id, String name, String phone, String email,
-                  String country, String city, String street) {
+                  String country, String city, String street, Date lastUpdated) {
         this.id = id;
         this.name = name;
         this.phone = phone;
@@ -47,8 +49,8 @@ public class Person implements Serializable {
         this.country = country;
         this.city = city;
         this.street = street;
+        this.lastUpdated = lastUpdated;
     }
-
 
 
     /* ------------------------ Getters & Setters ------------------------ */
@@ -109,6 +111,13 @@ public class Person implements Serializable {
         this.street = street;
     }
 
+    public Date getLastUpdated() {
+        return lastUpdated;
+    }
+
+    public void setLastUpdated(Date lastUpdated) {
+        this.lastUpdated = lastUpdated;
+    }
 
 
     @Override
@@ -140,8 +149,7 @@ public class Person implements Serializable {
                 ", country='" + country + '\'' +
                 ", city='" + city + '\'' +
                 ", street='" + street + '\'' +
+                ", lastUpdated=" + lastUpdated +
                 '}';
     }
 }
-
-

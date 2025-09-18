@@ -1,6 +1,7 @@
 package com.example.phonebook.repository;
 
 import com.example.phonebook.model.Person;
+import com.example.phonebook.repository.exception.StaleDataException;
 
 import java.util.List;
 import java.util.Optional;
@@ -28,7 +29,7 @@ public class DataService {
 
     // --- Active record locks (per record) ---
     // Key = record id, Value = userId/sessionId
-    private final ConcurrentMap<Integer, String> activeLocks = new ConcurrentHashMap<>();
+    //private final ConcurrentMap<Integer, String> activeLocks = new ConcurrentHashMap<>();
 
     private final List<Person> inMemoryDb =
             java.util.Collections.synchronizedList(new java.util.ArrayList<>());
@@ -106,7 +107,7 @@ public class DataService {
     }
 
     // ===== Locking helpers =====
-    public boolean lockRecord(Integer id, String userId) {
+    /*public boolean lockRecord(Integer id, String userId) {
         // Only one user can acquire the lock at a time
         return activeLocks.putIfAbsent(id, userId) == null;
     }
@@ -118,7 +119,7 @@ public class DataService {
 
     public Optional<String> getRecordLockOwner(Integer id) {
         return Optional.ofNullable(activeLocks.get(id));
-    }
+    }*/
 
 
 
@@ -151,7 +152,11 @@ public class DataService {
         } else {
             // UPDATE
             String oldPhone = idToPhone.get(id);
-            repository.update(contact);
+            //repository.update(contact);
+            boolean updated = repository.update(contact);
+            if (!updated) {
+                throw new StaleDataException("This record has been updated by another user. Please refresh your data.");
+            }
 
             if (oldPhone != null && !oldPhone.equals(phone)) {
                 phoneIndex.remove(oldPhone);
@@ -166,7 +171,11 @@ public class DataService {
     public synchronized void delete(Person contact) {
         if (contact == null) return;
 
-        repository.delete(contact);
+        //repository.delete(contact);
+        boolean deleted = repository.delete(contact);
+        if (!deleted) {
+            throw new StaleDataException("This record has been updated by another user. Please refresh your data.");
+        }
 
         if (contact.getPhone() != null) {
             phoneIndex.remove(contact.getPhone());
