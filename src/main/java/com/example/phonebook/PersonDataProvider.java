@@ -25,7 +25,6 @@ public class PersonDataProvider
     private final boolean useDatabase;
     private Consumer<Long> sizeChangeListener;
 
-    private long lastSeenVersion = -1;
 
     public PersonDataProvider(DataService dataService, boolean useDatabase) {
         this.dataService = dataService;
@@ -47,11 +46,7 @@ public class PersonDataProvider
         int limit = query.getLimit();
 
         if (useDatabase) {
-            long currentVersion = dataService.getVersion();
-            if (currentVersion != lastSeenVersion) {
-                lastSeenVersion = currentVersion;
-                dataService.reloadFromDatabase();
-            }
+            dataService.reloadFromDatabase();
         } else {
             // Always rebuild indexes from in-memory list, no DB hit
             dataService.reloadInMemory();
@@ -159,7 +154,6 @@ public class PersonDataProvider
                 mem.add(item);
             }
             dataService.reloadInMemory();  // rebuild indexes
-            dataService.getVersionAtomic().incrementAndGet(); // bump version
         }
     }
 
@@ -186,7 +180,6 @@ public class PersonDataProvider
             List<Person> mem = dataService.getInMemory();
             mem.removeIf(entity -> entity.getId().equals(item.getId()));
             dataService.reloadInMemory();  // rebuild indexes
-            dataService.getVersionAtomic().incrementAndGet(); // bump version
         }
     }
 }// end of class

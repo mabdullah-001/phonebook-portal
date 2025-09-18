@@ -24,18 +24,12 @@ public class DataService {
     private final ConcurrentMap<String, Person> phoneIndex = new ConcurrentHashMap<>();  //Used by the binder validator and by save() method.
     private final ConcurrentMap<Integer, String> idToPhone = new ConcurrentHashMap<>(); //To update/delete cache correctly, you must know the old phone number for that ID.
 
-    // --- Global version counter for dirty flag ---
-    private final AtomicLong version = new AtomicLong(0);
-
-    // --- Active record locks (per record) ---
-    // Key = record id, Value = userId/sessionId
-    //private final ConcurrentMap<Integer, String> activeLocks = new ConcurrentHashMap<>();
 
     private final List<Person> inMemoryDb =
             java.util.Collections.synchronizedList(new java.util.ArrayList<>());
     // Constructor
     public DataService() {
-        //reloadCache(); // build cache once at startup
+
     }
 
     // Accessors for PersonDataProvider
@@ -43,27 +37,6 @@ public class DataService {
         return inMemoryDb;
     }
 
-
-    public AtomicLong getVersionAtomic() {
-        return version;
-    }
-
-    /*private synchronized void reloadCache() {
-        phoneIndex.clear();
-        idToPhone.clear();
-
-        List<Person> all = repository.findAll();
-        for (Person p : all) {
-            if (p.getPhone() != null) {
-                phoneIndex.put(p.getPhone(), p);
-            }
-            if (p.getId() != null && p.getPhone() != null) {
-                idToPhone.put(p.getId(), p.getPhone());
-            }
-        }
-
-
-    }*/
 
     public synchronized void reloadFromDatabase() {
         phoneIndex.clear();
@@ -97,29 +70,6 @@ public class DataService {
         }
     }
 
-    // ===== Dirty flag helpers =====
-    private void markDirty() {
-        version.incrementAndGet();
-    }
-
-    public long getVersion() {
-        return version.get();
-    }
-
-    // ===== Locking helpers =====
-    /*public boolean lockRecord(Integer id, String userId) {
-        // Only one user can acquire the lock at a time
-        return activeLocks.putIfAbsent(id, userId) == null;
-    }
-
-    public void unlockRecord(Integer id, String userId) {
-        // Only unlock if the same user is holding the lock
-        activeLocks.computeIfPresent(id, (k, v) -> v.equals(userId) ? null : v);
-    }
-
-    public Optional<String> getRecordLockOwner(Integer id) {
-        return Optional.ofNullable(activeLocks.get(id));
-    }*/
 
 
 
@@ -164,7 +114,6 @@ public class DataService {
             phoneIndex.put(phone, contact);
             idToPhone.put(id, phone);
         }
-        markDirty();
     }
 
     // Delete contact
@@ -183,7 +132,6 @@ public class DataService {
         if (contact.getId() != null) {
             idToPhone.remove(contact.getId());
         }
-        markDirty();
 
     }
 

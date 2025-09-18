@@ -62,30 +62,9 @@ public class MainView extends Div {
 
         add(crud);
 
-        //setupAutoRefresh(crud);
     }
 
-    private void setupAutoRefresh(Crud<Person> crud) {
-        // Track last seen version for this UI
-        final long[] lastSeenVersion = { DataService.getInstance().getVersion() };
 
-        // Enable Vaadin polling (every 3 seconds)
-        UI.getCurrent().setPollInterval(3000);
-
-        UI.getCurrent().addPollListener(e -> {
-            long currentVersion = DataService.getInstance().getVersion();
-            if (currentVersion != lastSeenVersion[0]) {
-                lastSeenVersion[0] = currentVersion;
-                crud.getGrid().getDataProvider().refreshAll();
-                if (lastUpdateByMe) {
-                    lastUpdateByMe = false; // reset, no Notification for self
-                } else {
-                    Notification.show("Data updated from another user",
-                            2000, Notification.Position.TOP_END);
-                }
-            }
-        });
-    }
 
     private void setupToolbar() {
         Button button = new Button("Add Contact", VaadinIcon.PLUS.create());
@@ -172,19 +151,6 @@ public class MainView extends Div {
         // grid.removeColumnByKey(EDIT_COLUMN);
         // grid.removeColumn(grid.getColumnByKey(EDIT_COLUMN));
 
-        // Open editor on double click
-        /*grid.addItemDoubleClickListener(event -> crud.edit(event.getItem(),
-                Crud.EditMode.EXISTING_ITEM));*/
-        /*grid.addItemDoubleClickListener(event -> {
-            Person person = event.getItem();
-            boolean locked = DataService.getInstance().lockRecord(person.getId(), userId);
-
-            if (!locked) {
-                Notification.show("This record is already being edited by another user");
-            } else {
-                crud.edit(person, Crud.EditMode.EXISTING_ITEM);
-            }
-        });*/
 
         grid.addItemDoubleClickListener(event -> crud.edit(event.getItem(), Crud.EditMode.EXISTING_ITEM));
 
@@ -200,6 +166,7 @@ public class MainView extends Div {
         crud.addSaveListener(saveEvent -> {
             try {
                 dataProvider.persist(saveEvent.getItem());
+                //crud.getGrid().getDataProvider().refreshAll();
             } catch (StaleDataException e) {
                 Notification notification = Notification.show(e.getMessage(), 5000, Notification.Position.BOTTOM_END);
                 notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
