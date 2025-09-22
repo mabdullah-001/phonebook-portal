@@ -16,8 +16,9 @@ The application supports **CRUD operations (Create, Read, Update, Delete)**, **s
     - Required fields enforced (Name, Phone).
     - Phone must be numeric and unique.
     - Email format validated.
+    - Multi-user feature with vaadin Broadcaster
 - **UI**
-    - Grid for listing contacts.
+    - Vaadin CRUD Component used.
     - Responsive popup form for editing.
     - Inline validation messages.
     - Delete confirmation dialog.
@@ -52,16 +53,16 @@ The application supports **CRUD operations (Create, Read, Update, Delete)**, **s
 Run the following in **MySQL Workbench**:
 
 ```sql
-CREATE DATABASE phonebook;
-
-USE phonebook;
-
-CREATE TABLE contacts (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    phone VARCHAR(20) NOT NULL UNIQUE,
-    email VARCHAR(100),
-    country VARCHAR(50),
-    city VARCHAR(50),
-    street VARCHAR(100)
-);
+CREATE TABLE `contacts` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `phone` varchar(20) NOT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `country` varchar(100) DEFAULT NULL,
+  `city` varchar(100) DEFAULT NULL,
+  `street` varchar(255) DEFAULT NULL,
+  `last_updated` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `phone` (`phone`),
+  UNIQUE KEY `unique_phone` (`phone`)
+) ENGINE=InnoDB AUTO_INCREMENT=80 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
