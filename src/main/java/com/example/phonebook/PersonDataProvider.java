@@ -8,6 +8,7 @@ import com.vaadin.flow.data.provider.AbstractBackEndDataProvider;
 import com.vaadin.flow.data.provider.Query;
 
 import java.sql.*;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -23,13 +24,24 @@ public class PersonDataProvider
     // These static fields ensure the in-memory data and cache are shared across all user sessions.
     private static final List<Person> inMemoryDb = new ArrayList<>();
     private static final ConcurrentMap<String, Person> phoneIndex = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<Integer, String> idToPhone = new ConcurrentHashMap<>();
     private final boolean useDatabase;
+
+    // Helper methods for unit testing
+    public ConcurrentMap<String, Person> getPhoneIndex() {
+        return phoneIndex;
+    }
+
+    public ConcurrentMap<Integer, String> getIdToPhone() {
+        return idToPhone;
+    }
 
     public PersonDataProvider(boolean useDatabase) {
         this.useDatabase = useDatabase;
         if (useDatabase) {
             // In DB mode, populate the cache from the database on startup.
             findAllFromDb().forEach(p -> phoneIndex.put(p.getPhone(), p));
+            findAllFromDb().forEach(p -> idToPhone.put(p.getId(), p.getPhone()));
         }
     }
 
@@ -71,28 +83,74 @@ public class PersonDataProvider
             if (contact.getId() == null) {
                 addPerson(contact);
                 phoneIndex.put(contact.getPhone(), contact);
+                idToPhone.put(contact.getId(), contact.getPhone());
             } else {
-                String oldPhone = findPhoneById(contact.getId());
+                //String oldPhone = findPhoneById(contact.getId());
+                String oldPhone = idToPhone.get(contact.getId());
                 updatePerson(contact);
                 if (oldPhone != null && !oldPhone.equals(contact.getPhone())) {
                     phoneIndex.remove(oldPhone);
+                    idToPhone.remove(contact.getId());
                 }
                 phoneIndex.put(contact.getPhone(), contact);
+                idToPhone.put(contact.getId(), contact.getPhone());
             }
         } else {
             if (contact.getId() == null) {
-                contact.setId(inMemoryDb.stream().map(Person::getId).filter(Objects::nonNull).max(Integer::compare).orElse(0) + 1);
-                inMemoryDb.add(contact);
+                contact.setId(inMemoryDb.stream()
+                        .map(Person::getId)
+                        .filter(Objects::nonNull)
+                        .max(Integer::compare)
+                        .orElse(0) + 1);
+                contact.setLastUpdated(new Date(System.currentTimeMillis()));
+
+                // Always work with a defensive copy
+                Person p = new Person(contact);
+
+                inMemoryDb.add(p);
+                phoneIndex.put(p.getPhone(), p);
+                idToPhone.put(p.getId(), p.getPhone());
+
             } else {
-                Optional<Person> existing = inMemoryDb.stream().filter(p -> p.getId().equals(contact.getId())).findFirst();
+                Optional<Person> existing = inMemoryDb.stream()
+                        .filter(p -> p.getId().equals(contact.getId()))
+                        .findFirst();
+
                 if (existing.isPresent()) {
                     int index = inMemoryDb.indexOf(existing.get());
-                    inMemoryDb.set(index, contact);
+
+                    if (existing.get().getLastUpdated().equals(contact.getLastUpdated())) {
+                        // Update allowed → create new defensive copy
+                        Person p = new Person(contact);
+                        p.setLastUpdated(new Date(System.currentTimeMillis()));
+
+                        // Replace old object with the new copy
+                        inMemoryDb.set(index, p);
+
+                        // Update indexes
+                        String oldPhone = idToPhone.get(p.getId());
+                        if (oldPhone != null && !oldPhone.equals(p.getPhone())) {
+                            phoneIndex.remove(oldPhone);
+                        }
+                        phoneIndex.put(p.getPhone(), p);
+                        idToPhone.put(p.getId(), p.getPhone());
+
+                    } else {
+                        throw new StaleDataException(
+                                "This record has been updated by another user. Please refresh your data."
+                        );
+                    }
+
                 } else {
-                    inMemoryDb.add(contact);
+                    // Not found → treat as new record
+                    Person p = new Person(contact);
+                    p.setLastUpdated(new Date(System.currentTimeMillis()));
+
+                    inMemoryDb.add(p);
+                    phoneIndex.put(p.getPhone(), p);
+                    idToPhone.put(p.getId(), p.getPhone());
                 }
             }
-            phoneIndex.put(contact.getPhone(), contact);
         }
     }
 
@@ -100,9 +158,11 @@ public class PersonDataProvider
         if (useDatabase) {
             deletePerson(contact);
             phoneIndex.remove(contact.getPhone());
+            idToPhone.remove(contact.getId());
         } else {
             inMemoryDb.removeIf(p -> Objects.equals(p.getId(), contact.getId()));
             phoneIndex.remove(contact.getPhone());
+            idToPhone.remove(contact.getId());
         }
     }
 
