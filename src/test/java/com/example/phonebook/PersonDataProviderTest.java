@@ -38,7 +38,6 @@ public class PersonDataProviderTest {
         when(mockStmt.executeQuery()).thenReturn(mockRs);
         when(mockRs.next()).thenReturn(false); // no rows at startup
 
-        // Safe to initialize provider now
         dataProvider = new PersonDataProvider(true);
 
         // Clear caches for isolation
