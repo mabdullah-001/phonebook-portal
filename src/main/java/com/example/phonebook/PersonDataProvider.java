@@ -137,7 +137,7 @@ public class PersonDataProvider
 
                     } else {
                         throw new StaleDataException(
-                                "This record has been updated by another user. Please refresh your data."
+                                "This record has been modified by another user. Please ensure you are viewing the latest data."
                         );
                     }
 
@@ -225,7 +225,7 @@ public class PersonDataProvider
             stmt.setTimestamp(8, new Timestamp(contact.getLastUpdated().getTime()));
             int rowsAffected = stmt.executeUpdate();
             if (rowsAffected == 0) {
-                throw new StaleDataException("This record has been updated by another user. Please refresh your data.");
+                throw new StaleDataException("This record has been modified by another user. Please ensure you are viewing the latest data.");
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -240,7 +240,7 @@ public class PersonDataProvider
             stmt.setTimestamp(2, new Timestamp(contact.getLastUpdated().getTime()));
             int rowsAffected = stmt.executeUpdate();
             if (rowsAffected == 0) {
-                throw new StaleDataException("This record has been updated by another user. Please refresh your data.");
+                throw new StaleDataException("This record has been modified by another user. Please ensure you are viewing the latest data.");
             }
         } catch (SQLException e) {
             e.printStackTrace();
