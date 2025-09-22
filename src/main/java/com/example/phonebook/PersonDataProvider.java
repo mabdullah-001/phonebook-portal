@@ -293,7 +293,9 @@ public class PersonDataProvider
 
     private static Object valueOf(String fieldName, Person person) {
         try {
-            return Person.class.getDeclaredField(fieldName).get(person);
+            var field = Person.class.getDeclaredField(fieldName);
+            field.setAccessible(true); // allow reflective access
+            return field.get(person);
         } catch (Exception e) {
             e.printStackTrace();
             return null;
