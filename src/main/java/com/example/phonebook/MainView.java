@@ -100,8 +100,11 @@ public class MainView extends Div {
     private void setupGrid() {
         Grid<Person> grid = crud.getGrid();
 
+        /*List<String> visibleColumns = Arrays.asList(NAME, PHONE_NUMBER,
+                EMAIL, STREET, CITY, COUNTRY, EDIT_COLUMN);*/
+        //Hiding Street and City column
         List<String> visibleColumns = Arrays.asList(NAME, PHONE_NUMBER,
-                EMAIL, STREET, CITY, COUNTRY, EDIT_COLUMN);
+                EMAIL, COUNTRY, EDIT_COLUMN);
         grid.getColumns().forEach(column -> {
             String key = column.getKey();
             if (!visibleColumns.contains(key)) {
@@ -112,7 +115,7 @@ public class MainView extends Div {
         // Reorder the columns (alphabetical by default)
         grid.setColumnOrder(grid.getColumnByKey(NAME),
                 grid.getColumnByKey(PHONE_NUMBER), grid.getColumnByKey(EMAIL),
-                grid.getColumnByKey(STREET), grid.getColumnByKey(CITY),
+                //grid.getColumnByKey(STREET), grid.getColumnByKey(CITY),
                 grid.getColumnByKey(COUNTRY),
                 grid.getColumnByKey(EDIT_COLUMN));
 
