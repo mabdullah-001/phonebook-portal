@@ -47,6 +47,27 @@ The application supports **CRUD operations (Create, Read, Update, Delete)**, **s
 - (Optional) IntelliJ IDEA with the **Database Tools** plugin.
 
 ---
+## 🧪 Testing Libraries
+
+This project uses the following libraries for unit and integration testing:
+
+- [**JUnit 5**](https://junit.org/junit5/) – The standard framework for writing unit tests in Java.
+- [**Mockito**](https://site.mockito.org/) – Used for mocking dependencies, simulating behavior, and verifying method interactions.
+
+### 🔍 Usage in the Project
+
+- **JUnit 5** is used to write and run all test cases.
+- **Mockito** is used to:
+    - Mock DAO/repository classes in service layer tests.
+    - Simulate data conflicts and concurrent updates.
+    - Verify interactions (e.g., checking if a method was called).
+
+### 🧪 How to Run Tests
+
+You can run the tests using Maven:
+
+```bash
+mvn test
 
 ### 2. Database Setup
 
