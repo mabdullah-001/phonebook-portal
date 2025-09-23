@@ -87,3 +87,91 @@ CREATE TABLE `contacts` (
   UNIQUE KEY `phone` (`phone`),
   UNIQUE KEY `unique_phone` (`phone`)
 ) ENGINE=InnoDB AUTO_INCREMENT=80 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+## 💻 OS-Specific Setup & Run Guide
+
+### 🪟 Windows
+1. Install **MySQL Server + Workbench** using the [MySQL Installer](https://dev.mysql.com/downloads/installer/).
+2. MySQL usually starts automatically (check **Services** if not).
+3. Clone the repository:
+   ```powershell
+   git clone https://github.com/your-username/phonebook-portal.git
+   cd phonebook-portal
+   ```
+4. Build the project:
+   ```powershell
+   mvn clean install
+   ```
+5. Run the application:
+   ```powershell
+   mvn jetty:run
+   ```
+6. Open in browser: 👉 [http://localhost:8080](http://localhost:8080)
+7. Run tests:
+   ```powershell
+   mvn test
+   ```
+
+---
+
+### 🍏 macOS
+1. Install dependencies via [Homebrew](https://brew.sh/):
+   ```bash
+   brew install openjdk@17 maven mysql
+   ```
+2. Start MySQL service:
+   ```bash
+   brew services start mysql
+   ```
+3. Clone the repository:
+   ```bash
+   git clone https://github.com/your-username/phonebook-portal.git
+   cd phonebook-portal
+   ```
+4. Build the project:
+   ```bash
+   mvn clean install
+   ```
+5. Run the application:
+   ```bash
+   mvn jetty:run
+   ```
+6. Open in browser: 👉 [http://localhost:8080](http://localhost:8080)
+7. Run tests:
+   ```bash
+   mvn test
+   ```
+
+---
+
+### 🐧 Linux (Ubuntu/Debian)
+1. Install dependencies:
+   ```bash
+   sudo apt update
+   sudo apt install openjdk-17-jdk maven mysql-server
+   ```
+2. Start MySQL service:
+   ```bash
+   sudo service mysql start
+   ```
+3. Clone the repository:
+   ```bash
+   git clone https://github.com/your-username/phonebook-portal.git
+   cd phonebook-portal
+   ```
+4. Build the project:
+   ```bash
+   mvn clean install
+   ```
+5. Run the application:
+   ```bash
+   mvn jetty:run
+   ```
+6. Open in browser: 👉 [http://localhost:8080](http://localhost:8080)
+7. Run tests:
+   ```bash
+   mvn test
+   ```
+
+---
