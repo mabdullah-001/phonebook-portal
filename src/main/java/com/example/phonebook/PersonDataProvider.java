@@ -104,7 +104,6 @@ public class PersonDataProvider
                         .orElse(0) + 1);
                 contact.setLastUpdated(new Date(System.currentTimeMillis()));
 
-                // Always work with a defensive copy
                 Person p = new Person(contact);
 
                 inMemoryDb.add(p);
@@ -120,14 +119,11 @@ public class PersonDataProvider
                     int index = inMemoryDb.indexOf(existing.get());
 
                     if (existing.get().getLastUpdated().equals(contact.getLastUpdated())) {
-                        // Update allowed → create new defensive copy
                         Person p = new Person(contact);
                         p.setLastUpdated(new Date(System.currentTimeMillis()));
 
-                        // Replace old object with the new copy
                         inMemoryDb.set(index, p);
 
-                        // Update indexes
                         String oldPhone = idToPhone.get(p.getId());
                         if (oldPhone != null && !oldPhone.equals(p.getPhone())) {
                             phoneIndex.remove(oldPhone);
