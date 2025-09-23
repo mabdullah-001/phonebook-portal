@@ -174,4 +174,10 @@ CREATE TABLE `contacts` (
    mvn test
    ```
 
+
+## 📸 Screenshots
+
+Here’s a preview of the Phonebook Portal:
+![img_1.png](img_1.png)
+
 ---
