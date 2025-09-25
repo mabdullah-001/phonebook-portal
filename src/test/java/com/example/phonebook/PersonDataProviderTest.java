@@ -24,31 +24,33 @@ public class PersonDataProviderTest {
     private PersonDataProvider dataProvider;
     private MockedStatic<Database> mockedDatabase;
 
+    // Shared mocks
+    private Connection mockConnection;
+    private PreparedStatement mockStatement;
+    private ResultSet mockResultSet;
+    private ResultSet mockKeys;
+
     @BeforeEach
     void setup() throws Exception {
-        // Mock static Database before creating PersonDataProvider
         mockedDatabase = Mockito.mockStatic(Database.class);
 
-        Connection mockConn = Mockito.mock(Connection.class);
-        PreparedStatement mockStmt = Mockito.mock(PreparedStatement.class);
-        ResultSet mockRs = Mockito.mock(ResultSet.class);
+        mockConnection = mock(Connection.class);
+        mockStatement = mock(PreparedStatement.class);
+        mockResultSet = mock(ResultSet.class);
+        mockKeys = mock(ResultSet.class);
 
-        // Default stubbing for constructor call to findAllFromDb()
-        mockedDatabase.when(Database::getConnection).thenReturn(mockConn);
-        when(mockConn.prepareStatement(anyString())).thenReturn(mockStmt);
-        when(mockStmt.executeQuery()).thenReturn(mockRs);
-        when(mockRs.next()).thenReturn(false); // no rows at startup
+        mockedDatabase.when(Database::getConnection).thenReturn(mockConnection);
+        when(mockConnection.prepareStatement(anyString())).thenReturn(mockStatement);
+        when(mockStatement.executeQuery()).thenReturn(mockResultSet);
+        when(mockResultSet.next()).thenReturn(false);
 
         dataProvider = new PersonDataProvider(true);
-
-        // Clear caches for isolation
         dataProvider.getPhoneIndex().clear();
-        dataProvider.getIdToPhone().clear();
     }
 
     @AfterEach
     void teardown() {
-        mockedDatabase.close(); // release static mock
+        mockedDatabase.close();
     }
 
     @Test
@@ -57,11 +59,6 @@ public class PersonDataProviderTest {
         newPerson.setName("Test Create");
         newPerson.setPhone("1111111111");
 
-        Connection mockConnection = mock(Connection.class);
-        PreparedStatement mockStatement = mock(PreparedStatement.class);
-        ResultSet mockKeys = mock(ResultSet.class);
-
-        mockedDatabase.when(Database::getConnection).thenReturn(mockConnection);
         when(mockConnection.prepareStatement(anyString(), eq(Statement.RETURN_GENERATED_KEYS)))
                 .thenReturn(mockStatement);
         when(mockStatement.executeUpdate()).thenReturn(1);
@@ -77,15 +74,7 @@ public class PersonDataProviderTest {
 
     @Test
     void testReadPersonsFromDatabase() throws Exception {
-        Connection mockConnection = mock(Connection.class);
-        PreparedStatement mockStatement = mock(PreparedStatement.class);
-        ResultSet mockResultSet = mock(ResultSet.class);
-
-        mockedDatabase.when(Database::getConnection).thenReturn(mockConnection);
-        when(mockConnection.prepareStatement(anyString())).thenReturn(mockStatement);
-        when(mockStatement.executeQuery()).thenReturn(mockResultSet);
-
-        // Two rows in the result set
+        // Simulate 2 rows
         when(mockResultSet.next()).thenReturn(true, true, false);
         when(mockResultSet.getInt("id")).thenReturn(1, 2);
         when(mockResultSet.getString("name")).thenReturn("Read Test 1", "Read Test 2");
@@ -108,13 +97,7 @@ public class PersonDataProviderTest {
         existingPerson.setLastUpdated(new Date());
 
         dataProvider.getPhoneIndex().put(existingPerson.getPhone(), existingPerson);
-        dataProvider.getIdToPhone().put(existingPerson.getId(), existingPerson.getPhone());
 
-        Connection mockConnection = mock(Connection.class);
-        PreparedStatement mockStatement = mock(PreparedStatement.class);
-
-        mockedDatabase.when(Database::getConnection).thenReturn(mockConnection);
-        when(mockConnection.prepareStatement(anyString())).thenReturn(mockStatement);
         when(mockStatement.executeUpdate()).thenReturn(1);
 
         Person updatedPerson = new Person(existingPerson);
@@ -133,19 +116,11 @@ public class PersonDataProviderTest {
         personToDelete.setLastUpdated(new Date());
 
         dataProvider.getPhoneIndex().put("8888888888", personToDelete);
-        dataProvider.getIdToPhone().put(20, "8888888888");
 
-        Connection mockConnection = mock(Connection.class);
-        PreparedStatement mockStatement = mock(PreparedStatement.class);
-
-        mockedDatabase.when(Database::getConnection).thenReturn(mockConnection);
-        when(mockConnection.prepareStatement(anyString())).thenReturn(mockStatement);
         when(mockStatement.executeUpdate()).thenReturn(1);
 
         dataProvider.delete(personToDelete);
-
         verify(mockStatement, times(1)).executeUpdate();
         assertTrue(dataProvider.getPhoneIndex().isEmpty());
-        assertTrue(dataProvider.getIdToPhone().isEmpty());
     }
 }

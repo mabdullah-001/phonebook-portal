@@ -25,7 +25,9 @@ The application supports **CRUD operations (Create, Read, Update, Delete)**, **s
 - **Persistence**
     - In-memory repository (for quick testing).
     - JDBC repository with **MySQL database**.
-
+- **Switch**
+  - **For Database Mode**: Set the **useDatabase** flag to **true** in MainView Class to run the application with a database backend.
+  - **For In-Memory Mode**: Set the **useDatabase** flag to **false** MainView Class to run the application with in-memory persistence.
 ---
 
 ## 🛠️ Tech Stack
@@ -68,7 +70,7 @@ You can run the tests using Maven:
 
 ```bash
 mvn test
-
+   ```
 ### 2. Database Setup
 
 Run the following in **MySQL Workbench**:

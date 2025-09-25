@@ -130,13 +130,19 @@ public class MainView extends Div {
             }
         });
 
-        crud.addEditListener(saveEvent -> {
+        crud.addEditListener(event -> {
+            Person edited = event.getItem();
             try {
-                dataProvider.persist(saveEvent.getItem());
-                crud.getGrid().getDataProvider().refreshItem(saveEvent.getItem());
+                if (edited.getId() != null) {
+                    Person existing = dataProvider.findById(edited.getId());
+                    if (existing != null && !dataProvider.hasChanged(existing, edited)) {
+                        return;
+                    }
+                }
+                dataProvider.persist(edited);
+                crud.getGrid().getDataProvider().refreshItem(event.getItem());
             } catch (StaleDataException e) {
-                Notification notification = Notification.show(e.getMessage(), 5000, Notification.Position.BOTTOM_END);
-                notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
+            } catch (Exception e) {
             }
         });
 

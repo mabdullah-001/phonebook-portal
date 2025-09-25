@@ -17,40 +17,25 @@ import java.util.stream.Stream;
 public class PersonDataProvider
         extends AbstractBackEndDataProvider<Person, CrudFilter> {
 
-    // These static fields ensure the in-memory data and cache are shared across all user sessions.
     private static final List<Person> inMemoryDb = new ArrayList<>();
     private static final ConcurrentMap<String, Person> phoneIndex = new ConcurrentHashMap<>();
-    private static final ConcurrentMap<Integer, String> idToPhone = new ConcurrentHashMap<>();
     private final boolean useDatabase;
 
-    // Helper methods for unit testing
+    // Helper method for unit testing
     public ConcurrentMap<String, Person> getPhoneIndex() {
         return phoneIndex;
-    }
-
-    public ConcurrentMap<Integer, String> getIdToPhone() {
-        return idToPhone;
     }
 
     public PersonDataProvider(boolean useDatabase) {
         this.useDatabase = useDatabase;
         if (useDatabase) {
-            // In DB mode, populate the cache from the database on startup.
             findAllFromDb().forEach(p -> phoneIndex.put(p.getPhone(), p));
-            findAllFromDb().forEach(p -> idToPhone.put(p.getId(), p.getPhone()));
         }
     }
 
     @Override
     protected Stream<Person> fetchFromBackEnd(Query<Person, CrudFilter> query) {
-        Stream<Person> stream;
-        if (useDatabase) {
-            stream = findAllFromDb().stream();
-        } else {
-            // In in-memory mode, use the shared static list.
-            stream = inMemoryDb.stream();
-        }
-
+        Stream<Person> stream = useDatabase ? findAllFromDb().stream() : inMemoryDb.stream();
         if (query.getFilter().isPresent()) {
             stream = stream.filter(predicate(query.getFilter().get()));
         }
@@ -59,14 +44,7 @@ public class PersonDataProvider
 
     @Override
     protected int sizeInBackEnd(Query<Person, CrudFilter> query) {
-        List<Person> allContacts;
-        if (useDatabase) {
-            allContacts = findAllFromDb();
-        } else {
-            // In in-memory mode, get size from the shared static list.
-            allContacts = inMemoryDb;
-        }
-
+        List<Person> allContacts = useDatabase ? findAllFromDb() : inMemoryDb;
         Stream<Person> stream = allContacts.stream();
         if (query.getFilter().isPresent()) {
             stream = stream.filter(predicate(query.getFilter().get()));
@@ -75,86 +53,91 @@ public class PersonDataProvider
     }
 
     public synchronized void persist(Person contact) throws StaleDataException {
-        if (useDatabase) {
-            if (contact.getId() == null) {
-                addPerson(contact);
-                phoneIndex.put(contact.getPhone(), contact);
-                idToPhone.put(contact.getId(), contact.getPhone());
-            } else {
-                //String oldPhone = findPhoneById(contact.getId());
-                String oldPhone = idToPhone.get(contact.getId());
-                updatePerson(contact);
-                if (oldPhone != null && !oldPhone.equals(contact.getPhone())) {
-                    phoneIndex.remove(oldPhone);
-                    idToPhone.remove(contact.getId());
-                }
-                phoneIndex.put(contact.getPhone(), contact);
-                idToPhone.put(contact.getId(), contact.getPhone());
-            }
+        if (contact.getId() == null) {
+            persistNew(contact);
         } else {
-            if (contact.getId() == null) {
-                contact.setId(inMemoryDb.stream()
-                        .map(Person::getId)
-                        .filter(Objects::nonNull)
-                        .max(Integer::compare)
-                        .orElse(0) + 1);
-                contact.setLastUpdated(new Date(System.currentTimeMillis()));
-
-                Person p = new Person(contact);
-
-                inMemoryDb.add(p);
-                phoneIndex.put(p.getPhone(), p);
-                idToPhone.put(p.getId(), p.getPhone());
-
-            } else {
-                Optional<Person> existing = inMemoryDb.stream()
-                        .filter(p -> p.getId().equals(contact.getId()))
-                        .findFirst();
-
-                if (existing.isPresent()) {
-                    int index = inMemoryDb.indexOf(existing.get());
-
-                    if (existing.get().getLastUpdated().equals(contact.getLastUpdated())) {
-                        Person p = new Person(contact);
-                        p.setLastUpdated(new Date(System.currentTimeMillis()));
-
-                        inMemoryDb.set(index, p);
-
-                        String oldPhone = idToPhone.get(p.getId());
-                        if (oldPhone != null && !oldPhone.equals(p.getPhone())) {
-                            phoneIndex.remove(oldPhone);
-                        }
-                        phoneIndex.put(p.getPhone(), p);
-                        idToPhone.put(p.getId(), p.getPhone());
-
-                    } else {
-                        throw new StaleDataException(
-                                "This record has been modified by another user. Please ensure you are viewing the latest data."
-                        );
-                    }
-
-                } else {
-                    // Not found → treat as new record
-                    Person p = new Person(contact);
-                    p.setLastUpdated(new Date(System.currentTimeMillis()));
-
-                    inMemoryDb.add(p);
-                    phoneIndex.put(p.getPhone(), p);
-                    idToPhone.put(p.getId(), p.getPhone());
-                }
-            }
+            persistExisting(contact);
         }
     }
 
+    private void persistNew(Person contact) {
+        if (useDatabase) {
+            addPerson(contact);
+        } else {
+            contact.setId(inMemoryDb.stream()
+                    .map(Person::getId)
+                    .filter(Objects::nonNull)
+                    .max(Integer::compare)
+                    .orElse(0) + 1);
+            contact.setLastUpdated(new Date(System.currentTimeMillis()));
+
+            inMemoryDb.add(new Person(contact));
+        }
+        phoneIndex.put(contact.getPhone(), contact);
+    }
+
+    private void persistExisting(Person contact) throws StaleDataException {
+        Person existing = findById(contact.getId());
+        if (existing == null) {
+            throw new IllegalStateException("No existing record found with id=" + contact.getId());
+        }
+
+        if (!Objects.equals(existing.getLastUpdated(), contact.getLastUpdated())) {
+            throw new StaleDataException(
+                    "This record has been modified by another user. Please reload the data."
+            );
+        }
+
+        if (!hasContentChanged(existing, contact)) {
+            return;
+        }
+
+        if (useDatabase) {
+            updatePerson(contact);
+        } else {
+            int index = inMemoryDb.indexOf(existing);
+            Person p = new Person(contact);
+            p.setLastUpdated(new Date(System.currentTimeMillis()));
+            inMemoryDb.set(index, p);
+        }
+
+
+        String oldPhone = existing.getPhone();
+        if (!Objects.equals(oldPhone, contact.getPhone())) {
+            phoneIndex.remove(oldPhone);
+        }
+        if (useDatabase) {
+            phoneIndex.put(contact.getPhone(), contact);
+        } else {
+            Person stored = inMemoryDb.stream()
+                    .filter(p -> Objects.equals(p.getId(), contact.getId()))
+                    .findFirst()
+                    .orElse(new Person(contact));
+            phoneIndex.put(stored.getPhone(), stored);
+        }
+    }
+
+    private boolean hasContentChanged(Person existing, Person updated) {
+        return !Objects.equals(existing.getName(), updated.getName())
+                || !Objects.equals(existing.getPhone(), updated.getPhone())
+                || !Objects.equals(existing.getEmail(), updated.getEmail())
+                || !Objects.equals(existing.getCountry(), updated.getCountry())
+                || !Objects.equals(existing.getCity(), updated.getCity())
+                || !Objects.equals(existing.getStreet(), updated.getStreet());
+    }
+
+
+
     public synchronized void delete(Person contact) throws StaleDataException {
         if (useDatabase) {
-            deletePerson(contact);
-            phoneIndex.remove(contact.getPhone());
-            idToPhone.remove(contact.getId());
+            Person existing = findById(contact.getId());
+            if (existing != null) {
+                deletePerson(existing);
+                phoneIndex.remove(existing.getPhone());
+            }
         } else {
             inMemoryDb.removeIf(p -> Objects.equals(p.getId(), contact.getId()));
             phoneIndex.remove(contact.getPhone());
-            idToPhone.remove(contact.getId());
         }
     }
 
@@ -165,6 +148,17 @@ public class PersonDataProvider
         }
         return true;
     }
+    public Person findById(Integer id) {
+        return phoneIndex.values().stream()
+                .filter(p -> Objects.equals(p.getId(), id))
+                .findFirst()
+                .orElse(null);
+    }
+
+    public boolean hasChanged(Person existing, Person updated) {
+        return !Objects.equals(existing.getLastUpdated(), updated.getLastUpdated());
+    }
+
 
     private List<Person> findAllFromDb() {
         List<Person> contacts = new ArrayList<>();
@@ -191,20 +185,24 @@ public class PersonDataProvider
             stmt.setString(4, contact.getCountry());
             stmt.setString(5, contact.getCity());
             stmt.setString(6, contact.getStreet());
+
             int rowsAffected = stmt.executeUpdate();
             if (rowsAffected > 0) {
                 ResultSet generatedKeys = stmt.getGeneratedKeys();
                 if (generatedKeys.next()) {
                     contact.setId(generatedKeys.getInt(1));
                 }
+                contact.setLastUpdated(new Date(System.currentTimeMillis()));
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
 
+
     private void updatePerson(Person contact) throws StaleDataException {
-        String sql = "UPDATE contacts SET name=?, phone=?, email=?, country=?, city=?, street=? WHERE id=? AND last_updated=?";
+        String sql = "UPDATE contacts SET name=?, phone=?, email=?, country=?, city=?, street=? " +
+                "WHERE id=? AND last_updated=?";
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, contact.getName());
@@ -216,14 +214,16 @@ public class PersonDataProvider
             stmt.setInt(7, contact.getId());
             stmt.setTimestamp(8, new Timestamp(contact.getLastUpdated().getTime()));
             int rowsAffected = stmt.executeUpdate();
-            System.out.println("in db update method and row effected: "+ rowsAffected );
+
             if (rowsAffected == 0) {
-                throw new StaleDataException("This record has been modified by another user. Please ensure you are viewing the latest data.");
+                throw new StaleDataException("This record has been modified by another user. Please reload the data.");
             }
+            contact.setLastUpdated(new Date(System.currentTimeMillis()));
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
+
 
     private void deletePerson(Person contact) throws StaleDataException {
         String sql = "DELETE FROM contacts WHERE id=? AND last_updated=?";
