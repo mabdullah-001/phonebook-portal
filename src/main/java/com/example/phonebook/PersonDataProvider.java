@@ -1,14 +1,10 @@
 package com.example.phonebook;
 
-import com.example.phonebook.Database;
-import com.example.phonebook.Person;
-import com.example.phonebook.StaleDataException;
 import com.vaadin.flow.component.crud.CrudFilter;
 import com.vaadin.flow.data.provider.AbstractBackEndDataProvider;
 import com.vaadin.flow.data.provider.Query;
 
 import java.sql.*;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -220,6 +216,7 @@ public class PersonDataProvider
             stmt.setInt(7, contact.getId());
             stmt.setTimestamp(8, new Timestamp(contact.getLastUpdated().getTime()));
             int rowsAffected = stmt.executeUpdate();
+            System.out.println("in db update method and row effected: "+ rowsAffected );
             if (rowsAffected == 0) {
                 throw new StaleDataException("This record has been modified by another user. Please ensure you are viewing the latest data.");
             }
@@ -297,4 +294,4 @@ public class PersonDataProvider
             return null;
         }
     }
-}//eof
+}

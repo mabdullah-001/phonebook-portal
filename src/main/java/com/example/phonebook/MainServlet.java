@@ -1,8 +1,8 @@
 package com.example.phonebook;
 
 import com.vaadin.flow.server.VaadinServlet;
-import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.annotation.WebInitParam;
+import jakarta.servlet.annotation.WebServlet;
 
 @WebServlet(urlPatterns = "/*", name = "MainServlet", asyncSupported = true,
         initParams = {

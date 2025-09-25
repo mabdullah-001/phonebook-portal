@@ -1,8 +1,6 @@
 package com.example.phonebook;
 
-import com.example.phonebook.Person;
-import com.example.phonebook.StaleDataException;
-import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.crud.BinderCrudEditor;
 import com.vaadin.flow.component.crud.Crud;
@@ -10,18 +8,16 @@ import com.vaadin.flow.component.crud.CrudEditor;
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.textfield.EmailField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.binder.Binder;
 import com.vaadin.flow.router.Route;
-import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.icon.VaadinIcon;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 
 
 @Route("")
@@ -38,7 +34,7 @@ public class MainView extends Div {
     private static final String EDIT_COLUMN = "vaadin-crud-edit-column";
 
     // Flag to switch between database and in-memory storage
-    private final boolean useDatabase = true;
+    private final boolean useDatabase = false;
 
 
     public MainView() {
@@ -100,9 +96,6 @@ public class MainView extends Div {
     private void setupGrid() {
         Grid<Person> grid = crud.getGrid();
 
-        /*List<String> visibleColumns = Arrays.asList(NAME, PHONE_NUMBER,
-                EMAIL, STREET, CITY, COUNTRY, EDIT_COLUMN);*/
-        //Hiding Street and City column
         List<String> visibleColumns = Arrays.asList(NAME, PHONE_NUMBER,
                 EMAIL, COUNTRY, EDIT_COLUMN);
         grid.getColumns().forEach(column -> {
@@ -115,7 +108,6 @@ public class MainView extends Div {
         // Reorder the columns (alphabetical by default)
         grid.setColumnOrder(grid.getColumnByKey(NAME),
                 grid.getColumnByKey(PHONE_NUMBER), grid.getColumnByKey(EMAIL),
-                //grid.getColumnByKey(STREET), grid.getColumnByKey(CITY),
                 grid.getColumnByKey(COUNTRY),
                 grid.getColumnByKey(EDIT_COLUMN));
 
@@ -129,6 +121,16 @@ public class MainView extends Div {
         crud.setDataProvider(dataProvider);
 
         crud.addSaveListener(saveEvent -> {
+            try {
+                dataProvider.persist(saveEvent.getItem());
+                crud.getGrid().getDataProvider().refreshAll();
+            } catch (StaleDataException e) {
+                Notification notification = Notification.show(e.getMessage(), 5000, Notification.Position.BOTTOM_END);
+                notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
+        });
+
+        crud.addEditListener(saveEvent -> {
             try {
                 dataProvider.persist(saveEvent.getItem());
                 crud.getGrid().getDataProvider().refreshItem(saveEvent.getItem());
