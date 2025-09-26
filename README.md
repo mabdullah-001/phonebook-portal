@@ -16,7 +16,7 @@ The application supports **CRUD operations (Create, Read, Update, Delete)**, **s
     - Required fields enforced (Name, Phone).
     - Phone must be numeric and unique.
     - Email format validated.
-    - Multi-user feature with last_updated column db based.
+    - Multi-user feature.
 - **UI**
     - Vaadin CRUD Component used.
     - Responsive popup form for editing.
