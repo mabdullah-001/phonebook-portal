@@ -34,7 +34,7 @@ public class MainView extends Div {
     private static final String EDIT_COLUMN = "vaadin-crud-edit-column";
 
     // Flag to switch between database and in-memory storage
-    private final boolean useDatabase = false;
+    private final boolean useDatabase = true;
 
 
     public MainView() {
@@ -121,39 +121,51 @@ public class MainView extends Div {
         crud.setDataProvider(dataProvider);
 
         crud.addSaveListener(saveEvent -> {
-            try {
-                dataProvider.persist(saveEvent.getItem());
-                crud.getGrid().getDataProvider().refreshAll();
-            } catch (StaleDataException e) {
-                Notification notification = Notification.show(e.getMessage(), 5000, Notification.Position.BOTTOM_END);
-                notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
+            Person person = saveEvent.getItem();
+
+            // New record (Add Contact)
+            if (person.getId() == null) {
+                try {
+                    dataProvider.persist(person);
+                    crud.getGrid().getDataProvider().refreshAll();
+                    Notification.show("New contact saved", 3000, Notification.Position.BOTTOM_END);
+                } catch (StaleDataException e) {
+                    Notification n = Notification.show(e.getMessage(), 5000, Notification.Position.BOTTOM_END);
+                    n.addThemeVariants(NotificationVariant.LUMO_ERROR);
+                }
+            }
+            // Existing record (Edit Contact)
+            else {
+                try {
+                    dataProvider.persist(person);
+                    crud.getGrid().getDataProvider().refreshItem(person);
+                    Notification.show("Contact updated", 3000, Notification.Position.BOTTOM_END);
+                } catch (StaleDataException e) {
+                    Notification n = Notification.show(e.getMessage(), 5000, Notification.Position.BOTTOM_END);
+                    n.addThemeVariants(NotificationVariant.LUMO_ERROR);
+                }catch (Exception e) {
+                    Notification n = Notification.show(e.getMessage(), 5000, Notification.Position.BOTTOM_END);
+                    n.addThemeVariants(NotificationVariant.LUMO_ERROR);
+                }
             }
         });
 
-        crud.addEditListener(event -> {
-            Person edited = event.getItem();
-            try {
-                if (edited.getId() != null) {
-                    Person existing = dataProvider.findById(edited.getId());
-                    if (existing != null && !dataProvider.hasChanged(existing, edited)) {
-                        return;
-                    }
-                }
-                dataProvider.persist(edited);
-                crud.getGrid().getDataProvider().refreshItem(event.getItem());
-            } catch (StaleDataException e) {
-            } catch (Exception e) {
-            }
-        });
 
         crud.addDeleteListener(deleteEvent -> {
             try {
                 dataProvider.delete(deleteEvent.getItem());
                 crud.getGrid().getDataProvider().refreshAll();
+                Notification.show("Contact Deleted", 3000, Notification.Position.BOTTOM_END);
             } catch (StaleDataException e) {
                 Notification notification = Notification.show(e.getMessage(), 5000, Notification.Position.BOTTOM_END);
                 notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
             }
         });
+
+        crud.addCancelListener(event -> {
+            crud.getGrid().getDataProvider().refreshAll();
+            System.out.println("pressed cancel button");
+        });
     }
+
 }

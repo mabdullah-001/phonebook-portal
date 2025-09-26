@@ -50,9 +50,7 @@ public class Person implements Serializable {
         this.country = other.country;
         this.city = other.city;
         this.street = other.street;
-
-        // Defensive copy of Date
-        this.lastUpdated = (other.lastUpdated != null) ? new Date(other.lastUpdated.getTime()) : null;
+        this.lastUpdated = other.lastUpdated;
     }
 
 
